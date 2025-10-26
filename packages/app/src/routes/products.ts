@@ -1,8 +1,8 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type IRouter } from 'express';
 import { products, Product } from '../data';
 import { v4 as uuidv4 } from 'uuid';
 
-const router = Router();
+const router: IRouter = Router();
 
 /**
  * GET /api/products - Get all products

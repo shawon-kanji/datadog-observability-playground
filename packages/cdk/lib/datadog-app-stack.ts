@@ -176,6 +176,16 @@ export class DatadogAppStack extends cdk.Stack {
       },
     });
 
+    // Add port mappings for Datadog Agent
+    datadogAgentContainer.addPortMappings({
+      containerPort: 8126,
+      protocol: ecs.Protocol.TCP,
+    });
+    datadogAgentContainer.addPortMappings({
+      containerPort: 8125,
+      protocol: ecs.Protocol.UDP,
+    });
+
     // Application Container
     const appContainer = taskDefinition.addContainer('AppContainer', {
       containerName: 'app',

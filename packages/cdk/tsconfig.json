@@ -18,11 +18,13 @@
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
     "typeRoots": ["./node_modules/@types"],
+    "types": ["node", "jest"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "cdk.out"
   },
+  "include": ["bin/**/*", "lib/**/*", "test/**/*"],
   "exclude": ["node_modules", "cdk.out"]
 }

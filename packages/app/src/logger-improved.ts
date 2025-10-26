@@ -1,6 +1,6 @@
 /**
- * Custom logger with Datadog integration
- * Logs are automatically enriched with trace context for correlation
+ * Improved logger with proper Datadog trace correlation
+ * Logs include trace_id and span_id for correlation with APM
  */
 import tracer from 'dd-trace';
 
@@ -18,7 +18,7 @@ const LOG_LEVELS: LogLevel = {
   DEBUG: 'debug'
 };
 
-class Logger {
+class DatadogLogger {
   private service: string;
   private env: string;
 
@@ -54,7 +54,7 @@ class Logger {
       service: this.service,
       env: this.env,
       message,
-      ...traceContext, // Add trace_id and span_id for correlation
+      ...traceContext, // Add trace_id and span_id
       ...(context && { context })
     };
 
@@ -91,4 +91,4 @@ class Logger {
   }
 }
 
-export const logger = new Logger();
+export const logger = new DatadogLogger();

@@ -1,5 +1,5 @@
 {
-  "name": "test-datadog-logs-monorepo",
+  "name": "datadog-observability-playground",
   "version": "1.0.0",
   "private": true,
   "description": "Datadog learning playground - TypeScript API with APM, tracing, and logging practice",

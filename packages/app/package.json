@@ -1,5 +1,5 @@
 {
-  "name": "@test-datadog-logs/app",
+  "name": "@datadog-observability-playground/app",
   "version": "1.0.0",
   "private": true,
   "description": "Datadog learning application - TypeScript REST API with APM, tracing, and logging",

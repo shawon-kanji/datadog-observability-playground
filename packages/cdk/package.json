@@ -1,5 +1,5 @@
 {
-  "name": "@test-datadog-logs/cdk",
+  "name": "@datadog-observability-playground/cdk",
   "version": "1.0.0",
   "private": true,
   "description": "CDK infrastructure for Datadog test application",

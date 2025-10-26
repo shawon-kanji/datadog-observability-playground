@@ -9,7 +9,7 @@ This is a pnpm monorepo containing:
 ## 📦 Monorepo Structure
 
 ```
-test-datadog-logs/
+datadog-observability-playground/
 ├── packages/
 │   ├── app/              # Application code
 │   │   ├── src/          # TypeScript source files

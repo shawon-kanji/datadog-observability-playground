@@ -1,408 +1,326 @@
-# Test Datadog CRUD API
+# Datadog Learning Playground - Monorepo
 
-A TypeScript-based REST API with full Datadog integration for APM, logging, and tracing. This application includes scenario simulation capabilities to test various monitoring scenarios in Datadog, perfect for practicing site reliability engineering.
+> TypeScript REST API with full Datadog observability integration (APM, tracing, logging). Practice monitoring, error tracking, and performance analysis.
 
-## Features
+This is a pnpm monorepo containing:
+- **Application**: TypeScript REST API with Datadog integration
+- **Infrastructure**: AWS CDK code for ECS Fargate deployment
 
-- **CRUD Operations**: Full Create, Read, Update, Delete operations for products
-- **Datadog Integration**:
-  - APM (Application Performance Monitoring)
-  - Distributed Tracing
-  - Log Injection with trace correlation
-  - Runtime Metrics
-  - Continuous Profiling
-- **Scenario Simulation**: Test different application states
-  - Client errors (400)
-  - Internal server errors (500)
-  - Long latency (5 seconds)
-  - Random latency (100ms - 3s)
-  - Timeout scenarios (30 seconds)
-- **ECS Ready**: Includes Docker and AWS ECS deployment configurations
-- **Production Best Practices**: TypeScript, structured logging, health checks, graceful shutdown
-
-## Project Structure
+## 📦 Monorepo Structure
 
 ```
-.
-├── src/
-│   ├── app.ts                      # Express app configuration
-│   ├── server.ts                   # Server entry point
-│   ├── tracer.ts                   # Datadog tracer initialization
-│   ├── logger.ts                   # Custom logger with DD integration
-│   ├── data.ts                     # Static product data
-│   ├── routes/
-│   │   └── products.ts             # Product CRUD routes
-│   └── utils/
-│       └── scenarioSimulator.ts    # Scenario simulation middleware
-├── Dockerfile                      # Multi-stage Docker build
-├── docker-compose.yml              # Local development with Datadog agent
-├── ecs-task-definition.json        # ECS Fargate task definition
-├── deploy-ecs.sh                   # ECS deployment script
-└── package.json
+test-datadog-logs/
+├── packages/
+│   ├── app/              # Application code
+│   │   ├── src/          # TypeScript source files
+│   │   ├── Dockerfile    # Docker configuration
+│   │   └── README.md     # Detailed app documentation
+│   └── cdk/              # AWS CDK infrastructure
+│       ├── bin/          # CDK app entry point
+│       ├── lib/          # CDK stacks
+│       └── README.md     # CDK deployment guide
+├── package.json          # Root monorepo configuration
+├── pnpm-workspace.yaml   # pnpm workspace config
+└── README.md             # This file
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### Automated Setup (Recommended)
+### Prerequisites
+
+- **Node.js** 18+ installed
+- **pnpm** 8+ installed (`npm install -g pnpm`)
+- **Docker** (for containerized setup)
+- **Datadog account** and API key
+
+### Installation
 
 ```bash
-# Run the setup script and choose your option
-./setup-local.sh
+# Install all dependencies for all packages
+pnpm install
 ```
 
-The script will guide you through:
-1. **Docker Compose** - Easiest, runs everything in containers
-2. **Dockerized Agent + Local App** - Agent in Docker, app runs natively
-3. **Manual Setup** - Install dependencies only
+### Running the Application
 
-### Manual Quick Start
-
-See detailed instructions in [LOCAL_SETUP.md](LOCAL_SETUP.md) for all options.
-
-**Option 1: Docker Compose (Easiest)**
 ```bash
-export DD_API_KEY=your-datadog-api-key
-docker-compose up
+# Run in development mode
+pnpm dev
+
+# Build the application
+pnpm build
+
+# Start production build
+pnpm start
+
+# Build all packages
+pnpm build:all
 ```
 
-**Option 2: Local Node.js + Dockerized Agent**
+## 📋 Available Commands
+
+### Root Level (Monorepo)
+
 ```bash
-# Start Datadog agent in Docker
-docker run -d --name datadog-agent \
-  -e DD_API_KEY=your-key \
-  -e DD_SITE=datadoghq.com \
-  -e DD_APM_ENABLED=true \
-  -e DD_APM_NON_LOCAL_TRAFFIC=true \
-  -p 8126:8126 -p 8125:8125/udp \
-  gcr.io/datadoghq/agent:latest
+# Application commands
+pnpm dev                    # Run app in development mode
+pnpm build                  # Build application
+pnpm start                  # Start application
+pnpm build:all              # Build all packages
 
-# Run your app locally
-npm install
-npm run dev
+# Infrastructure commands
+pnpm cdk:deploy             # Deploy infrastructure to AWS
+pnpm cdk:destroy            # Destroy AWS infrastructure
+pnpm cdk:synth              # Synthesize CloudFormation template
+pnpm cdk:diff               # Show infrastructure changes
+
+# Maintenance
+pnpm clean                  # Clean all build outputs
+pnpm clean:all              # Clean all including node_modules
+pnpm lint                   # Run linting (if configured)
+pnpm test                   # Run tests (if configured)
 ```
 
-**Option 3: Native Datadog Agent on Laptop**
+### Package-Specific Commands
 
-Install the agent directly on your machine:
-- macOS: `DD_API_KEY=your-key bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_mac_os.sh)"`
-- Linux: See [LOCAL_SETUP.md](LOCAL_SETUP.md)
-- Windows: Download from [Datadog](https://www.datadoghq.com/)
-
-Then run: `npm install && npm run dev`
-
-## Prerequisites
-
-- Node.js 18+ (for local development)
-- Docker (for containerized setup)
-- Datadog account and API key (get one at https://app.datadoghq.com/)
-- (For ECS) AWS account with ECR and ECS configured
-
-## Environment Variables
-
-Create a `.env` file (see `.env.example`):
+Run commands in specific packages using `--filter`:
 
 ```bash
 # Application
-PORT=3000
-NODE_ENV=production
+pnpm --filter app dev
+pnpm --filter app build
+pnpm --filter app start
 
-# Datadog
-DD_SERVICE=test-datadog-crud-api
-DD_ENV=production
-DD_VERSION=1.0.0
-DD_AGENT_HOST=localhost  # or datadog-agent for Docker
-DD_TRACE_AGENT_PORT=8126
-DD_API_KEY=your-datadog-api-key
+# CDK
+pnpm --filter cdk deploy
+pnpm --filter cdk destroy
+pnpm --filter cdk synth
 ```
 
-## Local Development
+## 🏗️ Packages
 
-### Option 1: Node.js
+### 1. Application (`packages/app`)
 
-```bash
-# Install dependencies
-npm install
+TypeScript REST API with Datadog integration featuring:
+- CRUD operations for products
+- Scenario simulation (errors, latency, timeouts)
+- Full Datadog APM, tracing, and logging
+- Docker and docker-compose setup
 
-# Run in development mode
-npm run dev
+**[View detailed app documentation →](packages/app/README.md)**
 
-# Build for production
-npm run build
+### 2. Infrastructure (`packages/cdk`)
 
-# Run production build
-npm start
-```
+AWS CDK infrastructure as code including:
+- VPC with public/private subnets
+- ECS Fargate cluster and service
+- Application Load Balancer
+- ECR repository
+- CloudWatch log groups
+- Secrets Manager for Datadog API key
+- Auto-scaling configuration
 
-### Option 2: Docker Compose (with Datadog Agent)
+**[View CDK deployment guide →](packages/cdk/README.md)**
 
-```bash
-# Set your Datadog API key
-export DD_API_KEY=your-datadog-api-key
+## 🎯 Development Workflow
 
-# Start application and Datadog agent
-docker-compose up
+### Local Development
 
-# Stop and remove containers
-docker-compose down
-```
+1. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
 
-## API Endpoints
+2. **Run locally with Docker Compose** (easiest):
+   ```bash
+   cd packages/app
+   export DD_API_KEY=your-datadog-api-key
+   docker-compose up
+   ```
 
-### Health Check
-```bash
-GET /health
-```
+3. **Or run with local Node.js**:
+   ```bash
+   # Start Datadog agent in Docker
+   cd packages/app
+   docker run -d --name datadog-agent \
+     -e DD_API_KEY=your-key \
+     -e DD_SITE=datadoghq.com \
+     -e DD_APM_ENABLED=true \
+     -e DD_APM_NON_LOCAL_TRAFFIC=true \
+     -p 8126:8126 -p 8125:8125/udp \
+     gcr.io/datadoghq/agent:latest
 
-### Products CRUD
+   # Run app
+   cd ../..
+   pnpm dev
+   ```
 
-All endpoints support scenario simulation via query parameter:
+### AWS Deployment
 
-#### Get All Products
-```bash
-GET /api/products
-GET /api/products?scenario=long-latency
-```
+1. **Configure AWS credentials**:
+   ```bash
+   aws configure
+   ```
 
-#### Get Product by ID
-```bash
-GET /api/products/:id
-GET /api/products/1?scenario=random-latency
-```
+2. **Bootstrap CDK** (first time only):
+   ```bash
+   cd packages/cdk
+   pnpm cdk bootstrap
+   ```
 
-#### Create Product
-```bash
-POST /api/products
-Content-Type: application/json
+3. **Deploy infrastructure**:
+   ```bash
+   pnpm cdk:deploy --context datadogApiKey=your-key
+   ```
 
-{
-  "name": "New Product",
-  "price": 99.99,
-  "category": "Electronics",
-  "stock": 100
-}
+4. **Build and push Docker image**:
+   ```bash
+   cd packages/app
 
-# With scenario
-POST /api/products?scenario=error
-```
+   # Build
+   docker build -t test-datadog-crud-api:latest .
 
-#### Update Product
-```bash
-PUT /api/products/:id
-Content-Type: application/json
+   # Login to ECR
+   aws ecr get-login-password --region us-east-1 | \
+     docker login --username AWS --password-stdin <ECR_URI>
 
-{
-  "name": "Updated Product",
-  "price": 149.99
-}
+   # Tag and push
+   docker tag test-datadog-crud-api:latest <ECR_URI>:latest
+   docker push <ECR_URI>:latest
 
-# With scenario
-PUT /api/products/1?scenario=internal-error
-```
+   # Force new deployment
+   aws ecs update-service \
+     --cluster datadog-test-cluster-dev \
+     --service test-datadog-crud-api-service-dev \
+     --force-new-deployment
+   ```
 
-#### Delete Product
-```bash
-DELETE /api/products/:id
-DELETE /api/products/1?scenario=timeout
-```
+See detailed deployment instructions in [packages/cdk/README.md](packages/cdk/README.md).
 
-## Scenario Simulation
+## 🧪 Testing Datadog Features
 
-Add `?scenario=<type>` to any `/api/*` endpoint to simulate different states:
-
-| Scenario | Description | Example |
-|----------|-------------|---------|
-| `normal` | No delay (default) | `/api/products?scenario=normal` |
-| `error` | 400 Bad Request | `/api/products?scenario=error` |
-| `internal-error` | 500 Internal Server Error | `/api/products?scenario=internal-error` |
-| `long-latency` | 5 second delay | `/api/products?scenario=long-latency` |
-| `random-latency` | Random 100ms-3s delay | `/api/products?scenario=random-latency` |
-| `timeout` | 30 second delay | `/api/products?scenario=timeout` |
-
-## Testing Scenarios with cURL
+Once the application is running, test different scenarios:
 
 ```bash
 # Normal request
 curl http://localhost:3000/api/products
 
-# Trigger error
+# Trigger client error (400)
 curl http://localhost:3000/api/products?scenario=error
 
-# Trigger internal error
+# Trigger server error (500)
 curl http://localhost:3000/api/products?scenario=internal-error
 
-# Test latency
+# Test latency (5 seconds)
 curl http://localhost:3000/api/products?scenario=long-latency
 
-# Random latency
+# Random latency (100ms-3s)
 curl http://localhost:3000/api/products?scenario=random-latency
 
-# Create product with error
-curl -X POST http://localhost:3000/api/products?scenario=error \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test","price":99,"category":"Test","stock":10}'
+# Timeout test (30 seconds)
+curl http://localhost:3000/api/products?scenario=timeout
 ```
 
-## AWS ECS Deployment
+## 📊 Monitoring in Datadog
 
-### Prerequisites
+After deployment, explore these Datadog features:
 
-1. **Create ECR Repository**
+1. **APM → Services**: View `test-datadog-crud-api` metrics
+2. **Traces**: See distributed traces with request flow
+3. **Logs**: Filter by `service:test-datadog-crud-api`
+4. **Infrastructure**: Monitor ECS tasks and containers
+5. **Profiling**: Analyze CPU and memory usage
+
+## 🛠️ Why pnpm Monorepo?
+
+Benefits of this monorepo structure:
+
+- **Shared dependencies**: Install once, use everywhere
+- **Atomic changes**: Update app and infrastructure together
+- **Fast**: pnpm uses hard links and content-addressable storage
+- **Type safety**: Share types between packages (future)
+- **Easy management**: Single command to build/test everything
+- **Workspace protocol**: Link packages without publishing
+
+## 📚 Additional Documentation
+
+- **Application Details**: See [packages/app/README.md](packages/app/README.md)
+  - API endpoints
+  - Scenario simulation
+  - Local setup options
+  - Troubleshooting
+
+- **Infrastructure Guide**: See [packages/cdk/README.md](packages/cdk/README.md)
+  - Architecture overview
+  - Deployment steps
+  - Cost estimates
+  - Security best practices
+
+- **Quick Reference**: See [packages/app/QUICK_REFERENCE.md](packages/app/QUICK_REFERENCE.md)
+- **Getting Started**: See [packages/app/GETTING_STARTED.md](packages/app/GETTING_STARTED.md)
+
+## 🔧 Troubleshooting
+
+### pnpm not installed
 ```bash
-aws ecr create-repository \
-  --repository-name test-datadog-crud-api \
-  --region us-east-1
+npm install -g pnpm
 ```
 
-2. **Store Datadog API Key in Secrets Manager**
+### Clean and reinstall
 ```bash
-aws secretsmanager create-secret \
-  --name datadog-api-key \
-  --secret-string "your-datadog-api-key" \
-  --region us-east-1
+pnpm clean:all
+pnpm install
 ```
 
-3. **Create CloudWatch Log Groups**
+### Datadog agent not receiving data
+Check the agent logs:
 ```bash
-aws logs create-log-group \
-  --log-group-name /ecs/test-datadog-crud-api \
-  --region us-east-1
+# Docker Compose
+docker-compose -f packages/app/docker-compose.yml logs datadog-agent
 
-aws logs create-log-group \
-  --log-group-name /ecs/datadog-agent \
-  --region us-east-1
+# Docker
+docker logs datadog-agent
+
+# ECS
+aws logs tail /ecs/datadog-agent-dev --follow
 ```
 
-4. **Create ECS Cluster**
+### Port already in use
+Stop existing containers:
 ```bash
-aws ecs create-cluster \
-  --cluster-name datadog-test-cluster \
-  --region us-east-1
+docker-compose -f packages/app/docker-compose.yml down
 ```
 
-5. **Create ECS Service**
-```bash
-aws ecs create-service \
-  --cluster datadog-test-cluster \
-  --service-name test-datadog-crud-api-service \
-  --task-definition test-datadog-crud-api \
-  --desired-count 1 \
-  --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx],assignPublicIp=ENABLED}" \
-  --region us-east-1
-```
+## 💰 AWS Cost Estimate
 
-### Deploy
+Running the infrastructure on AWS:
+- **ECS Fargate**: ~$15-30/month (1 task)
+- **Application Load Balancer**: ~$16/month
+- **NAT Gateway**: ~$32/month
+- **CloudWatch Logs**: Minimal
+- **Total**: ~$60-80/month for learning
 
-```bash
-# Run deployment script
-./deploy-ecs.sh
+**To avoid costs**: Run `pnpm cdk:destroy` when done.
 
-# Monitor deployment
-aws ecs describe-services \
-  --cluster datadog-test-cluster \
-  --services test-datadog-crud-api-service \
-  --region us-east-1
-```
+## 📝 Project Goals
 
-## Datadog Dashboard Exploration
+This project is for **learning and practicing**:
+- Datadog APM and observability
+- Distributed tracing
+- Log correlation
+- Error monitoring
+- Performance profiling
+- AWS ECS/Fargate deployment
+- Infrastructure as Code (CDK)
+- Monorepo management with pnpm
 
-Once deployed, you can explore various Datadog features:
+## 🤝 Contributing
 
-### APM & Tracing
-1. Navigate to **APM > Services** in Datadog
-2. Find `test-datadog-crud-api` service
-3. Explore:
-   - Service overview metrics
-   - Trace analytics
-   - Service map
-   - Resource statistics
+Feel free to experiment, break things, and learn! This is a practice project.
 
-### Logs
-1. Navigate to **Logs** in Datadog
-2. Filter by: `service:test-datadog-crud-api`
-3. Notice trace correlation (trace IDs in logs)
-4. Use different scenario queries to see error patterns
-
-### Metrics & Monitoring
-1. **Infrastructure > Metrics Explorer**
-   - Runtime metrics (memory, CPU)
-   - Custom metrics
-2. **APM > Service Page**
-   - Latency percentiles (p50, p75, p95, p99)
-   - Error rates
-   - Throughput
-
-### Creating Monitors
-
-Create monitors for:
-- High error rate: `error.rate{service:test-datadog-crud-api}`
-- High latency: `trace.express.request{service:test-datadog-crud-api}`
-- Service availability
-
-### Practice Scenarios
-
-1. **Generate Normal Traffic**
-   ```bash
-   for i in {1..100}; do curl http://your-service/api/products; done
-   ```
-
-2. **Generate Errors**
-   ```bash
-   for i in {1..50}; do curl http://your-service/api/products?scenario=error; done
-   ```
-
-3. **Generate Latency Issues**
-   ```bash
-   for i in {1..20}; do curl http://your-service/api/products?scenario=long-latency & done
-   ```
-
-4. **Monitor and Alert**
-   - Watch metrics spike in Datadog
-   - See traces appear with different durations
-   - Correlate logs with traces
-   - Set up alerts for anomalies
-
-## Performance Profiling
-
-The application includes continuous profiling. View profiling data in:
-- Datadog > APM > Profiling
-- Analyze CPU, memory allocation, and I/O
-
-## Troubleshooting
-
-### Datadog Agent Not Receiving Data
-
-**Local (Docker Compose)**
-```bash
-# Check agent status
-docker-compose exec datadog-agent agent status
-```
-
-**ECS**
-```bash
-# Check container logs
-aws logs tail /ecs/datadog-agent --follow
-```
-
-### No Traces Appearing
-
-1. Verify tracer initialization happens first (check `src/server.ts`)
-2. Check environment variables are set correctly
-3. Verify agent is reachable: `DD_AGENT_HOST` and `DD_TRACE_AGENT_PORT`
-
-### Build Errors
-
-```bash
-# Clean and reinstall
-rm -rf node_modules dist
-npm install
-npm run build
-```
-
-## License
+## 📄 License
 
 MIT
 
-## Contributing
+---
 
-Feel free to submit issues and enhancement requests!
+**Need help?** Check the detailed READMEs in each package or visit [Datadog Documentation](https://docs.datadoghq.com/).

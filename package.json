@@ -1,33 +1,40 @@
 {
-  "name": "test-datadog-logs",
+  "name": "test-datadog-logs-monorepo",
   "version": "1.0.0",
-  "main": "dist/server.js",
+  "private": true,
+  "description": "Datadog learning playground - TypeScript API with APM, tracing, and logging practice",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "dev:docker": "nodemon --exec ts-node src/server.ts",
-    "start:local": "ts-node src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "pnpm --filter app dev",
+    "build": "pnpm --filter app build",
+    "start": "pnpm --filter app start",
+    "build:all": "pnpm -r build",
+    "clean": "pnpm -r exec rm -rf node_modules dist cdk.out .turbo",
+    "clean:all": "pnpm clean && rm -rf node_modules",
+    "cdk:deploy": "pnpm --filter cdk deploy",
+    "cdk:destroy": "pnpm --filter cdk destroy",
+    "cdk:synth": "pnpm --filter cdk synth",
+    "cdk:diff": "pnpm --filter cdk diff",
+    "lint": "pnpm -r lint --if-present",
+    "test": "pnpm -r test --if-present"
   },
-  "keywords": [],
+  "keywords": [
+    "datadog",
+    "observability",
+    "apm",
+    "tracing",
+    "logging",
+    "typescript",
+    "monorepo",
+    "pnpm"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dd-trace": "^5.73.0",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "uuid": "^13.0.0"
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
   },
+  "packageManager": "pnpm@8.15.0",
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.9.1",
-    "@types/uuid": "^10.0.0",
-    "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }

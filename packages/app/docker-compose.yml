@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Your application
@@ -26,7 +26,7 @@ services:
 
   # Datadog Agent
   datadog-agent:
-    image: gcr.io/datadoghq/agent:latest
+    image: gcr.io/datadoghq/agent:7
     environment:
       - DD_API_KEY=${DD_API_KEY}
       - DD_SITE=datadoghq.com
@@ -37,8 +37,8 @@ services:
       - DD_PROCESS_AGENT_ENABLED=true
       - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
     ports:
-      - "8126:8126"  # APM
-      - "8125:8125/udp"  # DogStatsD
+      - "8126:8126" # APM
+      - "8125:8125/udp" # DogStatsD
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc/:/host/proc/:ro

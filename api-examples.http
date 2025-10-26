@@ -1,0 +1,123 @@
+### API Examples for Test Datadog CRUD API
+### Use with REST Client extensions in VS Code or IntelliJ
+
+@baseUrl = http://localhost:3000
+
+### Health Check
+GET {{baseUrl}}/health
+
+### ============================================
+### NORMAL OPERATIONS
+### ============================================
+
+### Get All Products (Normal)
+GET {{baseUrl}}/api/products
+
+### Get Product by ID (Normal)
+GET {{baseUrl}}/api/products/1
+
+### Create Product (Normal)
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{
+  "name": "New Laptop",
+  "price": 1299.99,
+  "category": "Electronics",
+  "stock": 25
+}
+
+### Update Product (Normal)
+PUT {{baseUrl}}/api/products/2
+Content-Type: application/json
+
+{
+  "name": "Updated Wireless Mouse",
+  "price": 34.99,
+  "stock": 250
+}
+
+### Delete Product (Normal)
+DELETE {{baseUrl}}/api/products/5
+
+### ============================================
+### ERROR SCENARIOS
+### ============================================
+
+### Get Products - Client Error (400)
+GET {{baseUrl}}/api/products?scenario=error
+
+### Get Products - Internal Server Error (500)
+GET {{baseUrl}}/api/products?scenario=internal-error
+
+### Create Product - Error
+POST {{baseUrl}}/api/products?scenario=error
+Content-Type: application/json
+
+{
+  "name": "Test Product",
+  "price": 99.99,
+  "category": "Test",
+  "stock": 10
+}
+
+### ============================================
+### LATENCY SCENARIOS
+### ============================================
+
+### Get Products - Long Latency (5 seconds)
+GET {{baseUrl}}/api/products?scenario=long-latency
+
+### Get Product by ID - Random Latency
+GET {{baseUrl}}/api/products/1?scenario=random-latency
+
+### Create Product - Long Latency
+POST {{baseUrl}}/api/products?scenario=long-latency
+Content-Type: application/json
+
+{
+  "name": "Slow Product",
+  "price": 499.99,
+  "category": "Test",
+  "stock": 5
+}
+
+### Update Product - Random Latency
+PUT {{baseUrl}}/api/products/3?scenario=random-latency
+Content-Type: application/json
+
+{
+  "price": 299.99
+}
+
+### ============================================
+### TIMEOUT SCENARIO (30 seconds - be patient!)
+### ============================================
+
+### Get Products - Timeout (30s delay)
+# GET {{baseUrl}}/api/products?scenario=timeout
+
+### ============================================
+### MIXED SCENARIOS FOR LOAD TESTING
+### ============================================
+
+### Batch 1: Normal Operations
+GET {{baseUrl}}/api/products
+###
+GET {{baseUrl}}/api/products/2
+###
+GET {{baseUrl}}/api/products/3
+
+### Batch 2: Error Generation
+GET {{baseUrl}}/api/products?scenario=error
+###
+GET {{baseUrl}}/api/products?scenario=internal-error
+###
+GET {{baseUrl}}/api/products?scenario=error
+
+### Batch 3: Latency Testing
+GET {{baseUrl}}/api/products?scenario=random-latency
+###
+GET {{baseUrl}}/api/products/1?scenario=random-latency
+###
+GET {{baseUrl}}/api/products/4?scenario=long-latency

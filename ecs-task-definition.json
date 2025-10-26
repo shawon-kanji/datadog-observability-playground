@@ -1,0 +1,135 @@
+{
+  "family": "test-datadog-crud-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "test-datadog-crud-api",
+      "image": "YOUR_ECR_REPO_URI:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "3000"
+        },
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "DD_SERVICE",
+          "value": "test-datadog-crud-api"
+        },
+        {
+          "name": "DD_ENV",
+          "value": "production"
+        },
+        {
+          "name": "DD_VERSION",
+          "value": "1.0.0"
+        },
+        {
+          "name": "DD_AGENT_HOST",
+          "value": "localhost"
+        },
+        {
+          "name": "DD_TRACE_AGENT_PORT",
+          "value": "8126"
+        },
+        {
+          "name": "DD_LOGS_INJECTION",
+          "value": "true"
+        },
+        {
+          "name": "DD_RUNTIME_METRICS_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_PROFILING_ENABLED",
+          "value": "true"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/test-datadog-crud-api",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})\""
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    },
+    {
+      "name": "datadog-agent",
+      "image": "public.ecr.aws/datadog/agent:latest",
+      "essential": true,
+      "environment": [
+        {
+          "name": "DD_SITE",
+          "value": "datadoghq.com"
+        },
+        {
+          "name": "DD_APM_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_APM_NON_LOCAL_TRAFFIC",
+          "value": "true"
+        },
+        {
+          "name": "ECS_FARGATE",
+          "value": "true"
+        },
+        {
+          "name": "DD_LOGS_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL",
+          "value": "true"
+        },
+        {
+          "name": "DD_PROCESS_AGENT_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_DOGSTATSD_NON_LOCAL_TRAFFIC",
+          "value": "true"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DD_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:datadog-api-key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/datadog-agent",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

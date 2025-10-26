@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Your application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - DD_SERVICE=test-datadog-crud-api
+      - DD_ENV=development
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_LOGS_INJECTION=true
+      - DD_RUNTIME_METRICS_ENABLED=true
+      - DD_PROFILING_ENABLED=true
+    depends_on:
+      - datadog-agent
+    networks:
+      - datadog-network
+
+  # Datadog Agent
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:latest
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=datadoghq.com
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_PROCESS_AGENT_ENABLED=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+    ports:
+      - "8126:8126"  # APM
+      - "8125:8125/udp"  # DogStatsD
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    networks:
+      - datadog-network
+
+networks:
+  datadog-network:
+    driver: bridge

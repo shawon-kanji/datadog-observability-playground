@@ -1,204 +1,158 @@
-# Datadog Learning Playground - Monorepo
+# Datadog Observability Playground
 
-> TypeScript REST API with full Datadog observability integration (APM, tracing, logging). Practice monitoring, error tracking, and performance analysis.
+> TypeScript REST API with full Datadog observability integration (APM, tracing, logging). Practice monitoring, error tracking, and performance analysis in a pnpm monorepo.
+
+## Overview
 
 This is a pnpm monorepo containing:
-- **Application**: TypeScript REST API with Datadog integration
-- **Infrastructure**: AWS CDK code for ECS Fargate deployment
+- **Application** (`packages/app`): TypeScript REST API with Datadog integration
+- **Infrastructure** (`packages/cdk`): AWS CDK code for ECS Fargate deployment
+- **Documentation** (`docs/`): Comprehensive guides for setup, development, and deployment
 
-## 📦 Monorepo Structure
+## Quick Start
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Start application
+pnpm dev
+
+# 3. Test the API
+curl http://localhost:3000/api/products
+```
+
+For detailed setup instructions, see the **[Getting Started Guide](docs/getting-started.md)**.
+
+## Documentation
+
+### Core Guides
+
+- **[Getting Started](docs/getting-started.md)** - Set up the project and run your first request
+- **[Local Development](docs/local-development.md)** - Development workflows with pnpm workspaces
+- **[API Reference](docs/api-reference.md)** - Complete API endpoints documentation
+- **[Testing Guide](docs/testing.md)** - Test scenarios and load generation
+- **[Monitoring Guide](docs/monitoring.md)** - Datadog observability deep dive
+- **[Deployment Guide](docs/deployment.md)** - Deploy to AWS ECS with CDK
+- **[Architecture](docs/architecture.md)** - System design and architecture
+- **[Commands Reference](docs/commands-reference.md)** - Quick command reference
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+
+### Package Documentation
+
+- **[Application README](packages/app/README.md)** - Application package details
+- **[CDK README](packages/cdk/README.md)** - Infrastructure package details
+
+## Project Structure
 
 ```
 datadog-observability-playground/
+├── docs/                     # Consolidated documentation
+│   ├── getting-started.md
+│   ├── local-development.md
+│   ├── api-reference.md
+│   ├── testing.md
+│   ├── monitoring.md
+│   ├── deployment.md
+│   ├── architecture.md
+│   ├── commands-reference.md
+│   └── troubleshooting.md
 ├── packages/
-│   ├── app/              # Application code
-│   │   ├── src/          # TypeScript source files
-│   │   ├── Dockerfile    # Docker configuration
-│   │   └── README.md     # Detailed app documentation
-│   └── cdk/              # AWS CDK infrastructure
-│       ├── bin/          # CDK app entry point
-│       ├── lib/          # CDK stacks
-│       └── README.md     # CDK deployment guide
-├── package.json          # Root monorepo configuration
-├── pnpm-workspace.yaml   # pnpm workspace config
-└── README.md             # This file
+│   ├── app/                  # Application code
+│   │   ├── src/             # TypeScript source files
+│   │   ├── Dockerfile
+│   │   └── package.json
+│   └── cdk/                  # AWS CDK infrastructure
+│       ├── bin/
+│       ├── lib/
+│       └── package.json
+├── package.json              # Root monorepo configuration
+├── pnpm-workspace.yaml       # pnpm workspace config
+└── README.md                 # This file
 ```
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
+### Application Features
 
-- **Node.js** 18+ installed
-- **pnpm** 8+ installed (`npm install -g pnpm`)
-- **Docker** (for containerized setup)
-- **Datadog account** and API key
+- **CRUD API**: Full Create, Read, Update, Delete operations for products
+- **Datadog Integration**:
+  - APM (Application Performance Monitoring)
+  - Distributed Tracing
+  - Structured Logging with trace correlation
+  - Runtime Metrics (CPU, memory, event loop)
+  - Continuous Profiling
+- **Scenario Simulation**: Test different states (errors, latency, timeouts)
+- **Production-Ready**: TypeScript, health checks, graceful shutdown
 
-### Installation
+### Infrastructure Features
 
-```bash
-# Install all dependencies for all packages
-pnpm install
-```
+- **AWS ECS Fargate**: Serverless container deployment
+- **Application Load Balancer**: Public-facing HTTP load balancer
+- **Auto-Scaling**: CPU/memory-based scaling (1-4 tasks)
+- **CloudWatch Integration**: Centralized logging
+- **Secrets Management**: Secure Datadog API key storage
+- **Infrastructure as Code**: Full AWS CDK TypeScript implementation
 
-### Running the Application
+## Available Commands
 
-```bash
-# Run in development mode
-pnpm dev
-
-# Build the application
-pnpm build
-
-# Start production build
-pnpm start
-
-# Build all packages
-pnpm build:all
-```
-
-## 📋 Available Commands
-
-### Root Level (Monorepo)
+### From Repository Root
 
 ```bash
-# Application commands
+# Development
 pnpm dev                    # Run app in development mode
 pnpm build                  # Build application
-pnpm start                  # Start application
 pnpm build:all              # Build all packages
 
-# Infrastructure commands
-pnpm cdk:deploy             # Deploy infrastructure to AWS
+# Infrastructure
+pnpm cdk:deploy             # Deploy to AWS
 pnpm cdk:destroy            # Destroy AWS infrastructure
-pnpm cdk:synth              # Synthesize CloudFormation template
+pnpm cdk:synth              # Synthesize CloudFormation
 pnpm cdk:diff               # Show infrastructure changes
 
 # Maintenance
-pnpm clean                  # Clean all build outputs
-pnpm clean:all              # Clean all including node_modules
-pnpm lint                   # Run linting (if configured)
-pnpm test                   # Run tests (if configured)
+pnpm clean                  # Clean build outputs
+pnpm clean:all              # Clean everything
 ```
 
-### Package-Specific Commands
+See **[Commands Reference](docs/commands-reference.md)** for complete command list.
 
-Run commands in specific packages using `--filter`:
+## Development Workflows
+
+### Option 1: Docker Compose (Recommended for Learning)
 
 ```bash
-# Application
-pnpm --filter app dev
-pnpm --filter app build
-pnpm --filter app start
-
-# CDK
-pnpm --filter cdk deploy
-pnpm --filter cdk destroy
-pnpm --filter cdk synth
+cd packages/app
+export DD_API_KEY=your-datadog-api-key
+docker-compose up
 ```
 
-## 🏗️ Packages
+### Option 2: Local Node.js with pnpm
 
-### 1. Application (`packages/app`)
+```bash
+# From repository root
+pnpm dev
+```
 
-TypeScript REST API with Datadog integration featuring:
-- CRUD operations for products
-- Scenario simulation (errors, latency, timeouts)
-- Full Datadog APM, tracing, and logging
-- Docker and docker-compose setup
+### Option 3: Node.js + Dockerized Datadog Agent
 
-**[View detailed app documentation →](packages/app/README.md)**
+```bash
+# Terminal 1: Start agent
+docker run -d --name datadog-agent \
+  -e DD_API_KEY=your-key \
+  -e DD_APM_ENABLED=true \
+  -p 8126:8126 -p 8125:8125/udp \
+  gcr.io/datadoghq/agent:latest
 
-### 2. Infrastructure (`packages/cdk`)
+# Terminal 2: Start app
+pnpm dev
+```
 
-AWS CDK infrastructure as code including:
-- VPC with public/private subnets
-- ECS Fargate cluster and service
-- Application Load Balancer
-- ECR repository
-- CloudWatch log groups
-- Secrets Manager for Datadog API key
-- Auto-scaling configuration
+See **[Local Development Guide](docs/local-development.md)** for detailed workflows.
 
-**[View CDK deployment guide →](packages/cdk/README.md)**
+## Testing Scenarios
 
-## 🎯 Development Workflow
-
-### Local Development
-
-1. **Install dependencies**:
-   ```bash
-   pnpm install
-   ```
-
-2. **Run locally with Docker Compose** (easiest):
-   ```bash
-   cd packages/app
-   export DD_API_KEY=your-datadog-api-key
-   docker-compose up
-   ```
-
-3. **Or run with local Node.js**:
-   ```bash
-   # Start Datadog agent in Docker
-   cd packages/app
-   docker run -d --name datadog-agent \
-     -e DD_API_KEY=your-key \
-     -e DD_SITE=datadoghq.com \
-     -e DD_APM_ENABLED=true \
-     -e DD_APM_NON_LOCAL_TRAFFIC=true \
-     -p 8126:8126 -p 8125:8125/udp \
-     gcr.io/datadoghq/agent:latest
-
-   # Run app
-   cd ../..
-   pnpm dev
-   ```
-
-### AWS Deployment
-
-1. **Configure AWS credentials**:
-   ```bash
-   aws configure
-   ```
-
-2. **Bootstrap CDK** (first time only):
-   ```bash
-   cd packages/cdk
-   pnpm cdk bootstrap
-   ```
-
-3. **Deploy infrastructure**:
-   ```bash
-   pnpm cdk:deploy --context datadogApiKey=your-key
-   ```
-
-4. **Build and push Docker image**:
-   ```bash
-   cd packages/app
-
-   # Build
-   docker build -t test-datadog-crud-api:latest .
-
-   # Login to ECR
-   aws ecr get-login-password --region us-east-1 | \
-     docker login --username AWS --password-stdin <ECR_URI>
-
-   # Tag and push
-   docker tag test-datadog-crud-api:latest <ECR_URI>:latest
-   docker push <ECR_URI>:latest
-
-   # Force new deployment
-   aws ecs update-service \
-     --cluster datadog-test-cluster-dev \
-     --service test-datadog-crud-api-service-dev \
-     --force-new-deployment
-   ```
-
-See detailed deployment instructions in [packages/cdk/README.md](packages/cdk/README.md).
-
-## 🧪 Testing Datadog Features
-
-Once the application is running, test different scenarios:
+The application supports scenario simulation for testing different monitoring conditions:
 
 ```bash
 # Normal request
@@ -215,112 +169,122 @@ curl http://localhost:3000/api/products?scenario=long-latency
 
 # Random latency (100ms-3s)
 curl http://localhost:3000/api/products?scenario=random-latency
-
-# Timeout test (30 seconds)
-curl http://localhost:3000/api/products?scenario=timeout
 ```
 
-## 📊 Monitoring in Datadog
+See **[Testing Guide](docs/testing.md)** for comprehensive testing examples.
+
+## Monitoring in Datadog
 
 After deployment, explore these Datadog features:
 
-1. **APM → Services**: View `test-datadog-crud-api` metrics
-2. **Traces**: See distributed traces with request flow
-3. **Logs**: Filter by `service:test-datadog-crud-api`
-4. **Infrastructure**: Monitor ECS tasks and containers
-5. **Profiling**: Analyze CPU and memory usage
+1. **APM → Services**: View `test-datadog-crud-api` metrics and traces
+2. **Logs**: Filter by `service:test-datadog-crud-api` for correlated logs
+3. **Infrastructure**: Monitor ECS tasks, containers, and hosts
+4. **Dashboards**: Create custom dashboards with key metrics
+5. **Monitors**: Set up alerts for errors and latency
 
-## 🛠️ Why pnpm Monorepo?
+See **[Monitoring Guide](docs/monitoring.md)** for detailed Datadog usage.
+
+## Deployment to AWS
+
+```bash
+# 1. Configure AWS
+aws configure
+
+# 2. Bootstrap CDK (first time only)
+cd packages/cdk
+pnpm cdk bootstrap
+
+# 3. Deploy infrastructure
+pnpm cdk:deploy --context datadogApiKey=your-key
+
+# 4. Build and push Docker image
+cd ../app
+docker build -t test-datadog-crud-api:latest .
+# ... push to ECR (see deployment guide)
+
+# 5. Force ECS deployment
+aws ecs update-service --cluster datadog-test-cluster-dev \
+  --service test-datadog-crud-api-service-dev --force-new-deployment
+```
+
+See **[Deployment Guide](docs/deployment.md)** for complete deployment steps.
+
+## Why pnpm Monorepo?
 
 Benefits of this monorepo structure:
 
 - **Shared dependencies**: Install once, use everywhere
 - **Atomic changes**: Update app and infrastructure together
 - **Fast**: pnpm uses hard links and content-addressable storage
-- **Type safety**: Share types between packages (future)
+- **Type safety**: Share TypeScript types between packages
 - **Easy management**: Single command to build/test everything
 - **Workspace protocol**: Link packages without publishing
 
-## 📚 Additional Documentation
+## Cost Estimates
 
-- **Application Details**: See [packages/app/README.md](packages/app/README.md)
-  - API endpoints
-  - Scenario simulation
-  - Local setup options
-  - Troubleshooting
+Running on AWS (estimated):
 
-- **Infrastructure Guide**: See [packages/cdk/README.md](packages/cdk/README.md)
-  - Architecture overview
-  - Deployment steps
-  - Cost estimates
-  - Security best practices
-
-- **Quick Reference**: See [packages/app/QUICK_REFERENCE.md](packages/app/QUICK_REFERENCE.md)
-- **Getting Started**: See [packages/app/GETTING_STARTED.md](packages/app/GETTING_STARTED.md)
-
-## 🔧 Troubleshooting
-
-### pnpm not installed
-```bash
-npm install -g pnpm
-```
-
-### Clean and reinstall
-```bash
-pnpm clean:all
-pnpm install
-```
-
-### Datadog agent not receiving data
-Check the agent logs:
-```bash
-# Docker Compose
-docker-compose -f packages/app/docker-compose.yml logs datadog-agent
-
-# Docker
-docker logs datadog-agent
-
-# ECS
-aws logs tail /ecs/datadog-agent-dev --follow
-```
-
-### Port already in use
-Stop existing containers:
-```bash
-docker-compose -f packages/app/docker-compose.yml down
-```
-
-## 💰 AWS Cost Estimate
-
-Running the infrastructure on AWS:
 - **ECS Fargate**: ~$15-30/month (1 task)
 - **Application Load Balancer**: ~$16/month
 - **NAT Gateway**: ~$32/month
 - **CloudWatch Logs**: Minimal
-- **Total**: ~$60-80/month for learning
+- **Total**: ~$60-80/month
 
-**To avoid costs**: Run `pnpm cdk:destroy` when done.
+**To minimize costs**: Run `pnpm cdk:destroy` when not in use.
 
-## 📝 Project Goals
+## Learning Goals
 
-This project is for **learning and practicing**:
-- Datadog APM and observability
-- Distributed tracing
-- Log correlation
-- Error monitoring
-- Performance profiling
+This project helps you practice:
+
+- Datadog APM and distributed tracing
+- Log correlation and structured logging
+- Error monitoring and alerting
+- Performance profiling and optimization
 - AWS ECS/Fargate deployment
-- Infrastructure as Code (CDK)
-- Monorepo management with pnpm
+- Infrastructure as Code with AWS CDK
+- Monorepo management with pnpm workspaces
 
-## 🤝 Contributing
+## Troubleshooting
 
-Feel free to experiment, break things, and learn! This is a practice project.
+Common issues and solutions are documented in the **[Troubleshooting Guide](docs/troubleshooting.md)**.
 
-## 📄 License
+Quick fixes:
+
+```bash
+# Clean and reinstall
+pnpm clean:all
+pnpm install
+
+# Check Datadog agent
+docker exec datadog-agent agent status
+
+# Enable debug logging
+export DD_TRACE_DEBUG=true
+pnpm dev
+```
+
+## Contributing
+
+This is a learning and practice project. Feel free to:
+
+- Experiment with the code
+- Add new scenarios
+- Create custom dashboards
+- Practice incident investigation
+- Extend the infrastructure
+
+## License
 
 MIT
 
 ---
 
-**Need help?** Check the detailed READMEs in each package or visit [Datadog Documentation](https://docs.datadoghq.com/).
+## Quick Links
+
+- **[Getting Started](docs/getting-started.md)** - Start here
+- **[API Reference](docs/api-reference.md)** - API documentation
+- **[Deployment Guide](docs/deployment.md)** - Deploy to AWS
+- **[Monitoring Guide](docs/monitoring.md)** - Learn Datadog
+- **[Datadog Documentation](https://docs.datadoghq.com/)** - Official Datadog docs
+- **[AWS CDK Documentation](https://docs.aws.amazon.com/cdk/)** - AWS CDK docs

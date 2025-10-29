@@ -1,169 +1,154 @@
-# AWS CDK Infrastructure for Datadog Test Application
+# Infrastructure Package (AWS CDK)
 
-This CDK project defines the AWS infrastructure for deploying the Datadog test application on ECS Fargate with full observability.
+AWS Cloud Development Kit (CDK) infrastructure code for deploying the Datadog Observability Playground to AWS ECS Fargate.
+
+## Overview
+
+This package contains Infrastructure as Code using AWS CDK (TypeScript) to deploy:
+
+- **ECS Fargate cluster** with the application and Datadog agent
+- **Application Load Balancer** for public access
+- **VPC** with public and private subnets
+- **ECR repository** for Docker images
+- **CloudWatch log groups** for centralized logging
+- **Secrets Manager** for secure Datadog API key storage
+- **Auto-scaling** configuration (1-4 tasks based on CPU/memory)
+
+## Quick Start
+
+### Prerequisites
+
+- AWS account with appropriate permissions
+- AWS CLI configured (`aws configure`)
+- Node.js 18+ and pnpm installed
+- Docker installed
+- Datadog account and API key
+
+### Deploy
+
+```bash
+# From monorepo root
+pnpm install
+
+# Bootstrap CDK (first time only)
+cd packages/cdk
+pnpm cdk bootstrap
+
+# Deploy infrastructure
+pnpm deploy --context datadogApiKey=your-datadog-api-key
+
+# Or from repository root
+pnpm cdk:deploy --context datadogApiKey=your-key
+```
+
+See **[Deployment Guide](../../docs/deployment.md)** for complete deployment instructions.
+
+## Project Structure
+
+```
+packages/cdk/
+├── bin/
+│   └── app.ts                   # CDK app entry point
+├── lib/
+│   └── datadog-app-stack.ts     # Main infrastructure stack
+├── cdk.json                     # CDK configuration
+├── package.json                 # Dependencies and scripts
+└── README.md                    # This file
+```
 
 ## Architecture
 
-The infrastructure includes:
+### AWS Resources Created
 
-- **VPC**: Multi-AZ VPC with public and private subnets
-- **ECS Cluster**: Fargate cluster with Container Insights enabled
-- **ECS Service**: Fargate service running your application with Datadog agent sidecar
-- **Application Load Balancer**: Public-facing ALB for HTTP traffic
-- **ECR Repository**: Container registry for your application images
-- **CloudWatch Log Groups**: Centralized logging for both app and Datadog agent
-- **Secrets Manager**: Secure storage for Datadog API key
-- **Auto Scaling**: CPU and memory-based auto scaling (1-4 tasks)
-- **Security Groups**: Properly configured security groups for ALB and ECS service
+**Networking**:
+- VPC with 2 Availability Zones
+- Public subnets for ALB
+- Private subnets for ECS tasks
+- Internet Gateway and NAT Gateway
+- Route tables
 
-## Prerequisites
+**Compute**:
+- ECS Fargate cluster
+- ECS service with task definition
+- Application container (from ECR)
+- Datadog agent sidecar container
+- Auto-scaling (1-4 tasks)
 
-1. **AWS CLI** configured with credentials
-   ```bash
-   aws configure
-   ```
+**Load Balancing**:
+- Application Load Balancer (internet-facing)
+- Target group (port 3000)
+- Health check on `/health` endpoint
 
-2. **Node.js** 18+ and npm installed
+**Storage & Logging**:
+- ECR repository for Docker images
+- CloudWatch log groups (7-day retention)
 
-3. **AWS CDK CLI** installed globally
-   ```bash
-   npm install -g aws-cdk
-   ```
+**Security**:
+- Secrets Manager for Datadog API key
+- IAM roles for ECS task execution
+- Security groups for ALB and ECS
 
-4. **Datadog Account** and API key from https://app.datadoghq.com/
+See **[Architecture Guide](../../docs/architecture.md)** for detailed system design.
 
-5. **Docker** installed (for building and pushing images)
-
-## Setup
-
-### 1. Install Dependencies
-
-```bash
-cd cdk
-npm install
-```
-
-### 2. Bootstrap CDK (First Time Only)
-
-If this is your first time using CDK in this AWS account/region:
+## Available Scripts
 
 ```bash
-cdk bootstrap
+# Synthesize CloudFormation template
+pnpm synth
+
+# Show infrastructure differences
+pnpm diff
+
+# Deploy stack
+pnpm deploy
+
+# Destroy stack
+pnpm destroy
 ```
 
-### 3. Configure Datadog API Key
+## Deployment Process
 
-You have two options:
+### 1. Bootstrap CDK
 
-#### Option A: Pass API Key During Deployment (Quick)
-```bash
-cdk deploy --context datadogApiKey=your-datadog-api-key
-```
-
-#### Option B: Create Secret Manually (Recommended)
-```bash
-aws secretsmanager create-secret \
-  --name datadog-api-key-dev \
-  --secret-string "your-datadog-api-key" \
-  --region us-east-1
-```
-
-Then deploy without the API key parameter:
-```bash
-cdk deploy
-```
-
-## Deployment
-
-### View Infrastructure Changes
-
-Before deploying, review what will be created:
+First time only:
 
 ```bash
-cdk diff
+pnpm cdk bootstrap
 ```
 
-### Deploy Infrastructure
-
-**Deploy to dev environment (default):**
-```bash
-cdk deploy
-```
-
-**Deploy to a specific environment:**
-```bash
-cdk deploy --context environment=staging
-```
-
-**Deploy with custom settings:**
-```bash
-cdk deploy \
-  --context environment=prod \
-  --context datadogSite=datadoghq.eu \
-  --context datadogApiKey=your-key
-```
-
-### Deployment Output
-
-After deployment, you'll see outputs like:
-```
-Outputs:
-DatadogAppStack-dev.LoadBalancerUrl = http://datadog-app-alb-dev-xxxxx.us-east-1.elb.amazonaws.com
-DatadogAppStack-dev.EcrRepositoryUri = 123456789012.dkr.ecr.us-east-1.amazonaws.com/test-datadog-crud-api
-DatadogAppStack-dev.ClusterName = datadog-test-cluster-dev
-DatadogAppStack-dev.ServiceName = test-datadog-crud-api-service-dev
-```
-
-## Build and Push Application
-
-After infrastructure is deployed, build and push your application image:
-
-### 1. Build Docker Image
-
-From the project root (not the cdk folder):
+### 2. Deploy Infrastructure
 
 ```bash
-cd ..
+# From this directory
+pnpm deploy --context datadogApiKey=your-key
+
+# Or from repository root
+pnpm cdk:deploy --context datadogApiKey=your-key
+
+# Deploy to specific environment
+pnpm deploy --context environment=staging
+```
+
+### 3. Build and Push Application
+
+After infrastructure is deployed:
+
+```bash
+# Get ECR URI from CDK outputs
+# Build Docker image
+cd ../app
 docker build -t test-datadog-crud-api:latest .
-```
 
-### 2. Login to ECR
-
-```bash
+# Login to ECR
 aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin \
-  <YOUR_ECR_REPOSITORY_URI>
+  docker login --username AWS --password-stdin <ECR_URI>
+
+# Tag and push
+docker tag test-datadog-crud-api:latest <ECR_URI>:latest
+docker push <ECR_URI>:latest
 ```
 
-Example:
-```bash
-aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin \
-  123456789012.dkr.ecr.us-east-1.amazonaws.com
-```
-
-### 3. Tag and Push Image
-
-```bash
-# Tag the image
-docker tag test-datadog-crud-api:latest <YOUR_ECR_REPOSITORY_URI>:latest
-
-# Push the image
-docker push <YOUR_ECR_REPOSITORY_URI>:latest
-```
-
-Example:
-```bash
-docker tag test-datadog-crud-api:latest \
-  123456789012.dkr.ecr.us-east-1.amazonaws.com/test-datadog-crud-api:latest
-
-docker push \
-  123456789012.dkr.ecr.us-east-1.amazonaws.com/test-datadog-crud-api:latest
-```
-
-### 4. Force New Deployment
-
-After pushing a new image, force ECS to deploy it:
+### 4. Force ECS Deployment
 
 ```bash
 aws ecs update-service \
@@ -173,53 +158,55 @@ aws ecs update-service \
   --region us-east-1
 ```
 
-### All-in-One Script
+See **[Deployment Guide](../../docs/deployment.md)** for detailed step-by-step instructions.
 
-Create a `deploy-app.sh` script in the project root:
+## Configuration
+
+### Context Parameters
+
+Customize deployment with CDK context:
 
 ```bash
-#!/bin/bash
-set -e
-
-# Variables
-REGION=${AWS_REGION:-us-east-1}
-ENV=${ENVIRONMENT:-dev}
-ECR_URI=$(aws cloudformation describe-stacks \
-  --stack-name DatadogAppStack-${ENV} \
-  --query 'Stacks[0].Outputs[?OutputKey==`EcrRepositoryUri`].OutputValue' \
-  --output text \
-  --region ${REGION})
-
-echo "Building Docker image..."
-docker build -t test-datadog-crud-api:latest .
-
-echo "Logging in to ECR..."
-aws ecr get-login-password --region ${REGION} | \
-  docker login --username AWS --password-stdin ${ECR_URI}
-
-echo "Tagging image..."
-docker tag test-datadog-crud-api:latest ${ECR_URI}:latest
-
-echo "Pushing image to ECR..."
-docker push ${ECR_URI}:latest
-
-echo "Forcing new ECS deployment..."
-aws ecs update-service \
-  --cluster datadog-test-cluster-${ENV} \
-  --service test-datadog-crud-api-service-${ENV} \
-  --force-new-deployment \
-  --region ${REGION}
-
-echo "Deployment triggered! Monitor progress in AWS Console or CLI."
+pnpm deploy \
+  --context environment=prod \
+  --context datadogSite=datadoghq.eu \
+  --context datadogApiKey=your-key
 ```
 
-Make it executable and run:
-```bash
-chmod +x deploy-app.sh
-./deploy-app.sh
+Available context parameters:
+- `environment`: Environment name (dev, staging, prod) - default: dev
+- `datadogApiKey`: Your Datadog API key
+- `datadogSite`: Datadog site (datadoghq.com, datadoghq.eu) - default: datadoghq.com
+
+### Infrastructure Parameters
+
+Edit `bin/app.ts` to change:
+
+```typescript
+new DatadogAppStack(app, `DatadogAppStack-${environment}`, {
+  environment: environment,
+  datadogApiKey: datadogApiKey,
+  datadogSite: datadogSite,
+
+  // Customize these:
+  desiredCount: 1,        // Number of ECS tasks
+  cpu: 256,               // Task CPU (256, 512, 1024, 2048, 4096)
+  memory: 512,            // Task memory in MB
+});
 ```
 
-## Verify Deployment
+## Auto Scaling
+
+The deployment includes auto-scaling configuration:
+
+- **Min Tasks**: 1
+- **Max Tasks**: 4
+- **CPU Target**: 70%
+- **Memory Target**: 80%
+- **Scale Out Cooldown**: 60 seconds
+- **Scale In Cooldown**: 60 seconds
+
+## Verification
 
 ### Check Service Status
 
@@ -230,186 +217,147 @@ aws ecs describe-services \
   --region us-east-1
 ```
 
-### Check Running Tasks
-
-```bash
-aws ecs list-tasks \
-  --cluster datadog-test-cluster-dev \
-  --service-name test-datadog-crud-api-service-dev \
-  --region us-east-1
-```
-
 ### View Logs
 
-**Application logs:**
 ```bash
+# Application logs
 aws logs tail /ecs/test-datadog-crud-api-dev --follow
-```
 
-**Datadog agent logs:**
-```bash
+# Datadog agent logs
 aws logs tail /ecs/datadog-agent-dev --follow
 ```
 
-### Test the Application
-
-Get the Load Balancer URL from CDK outputs and test:
+### Test Application
 
 ```bash
-# Health check
-curl http://<ALB_DNS_NAME>/health
-
-# Get all products
-curl http://<ALB_DNS_NAME>/api/products
-
-# Test scenarios
-curl http://<ALB_DNS_NAME>/api/products?scenario=error
-curl http://<ALB_DNS_NAME>/api/products?scenario=long-latency
+# Get ALB URL from CDK outputs
+curl http://<ALB_URL>/health
+curl http://<ALB_URL>/api/products
 ```
+
+## Cost Estimates
+
+Running this infrastructure on AWS:
+
+- **ECS Fargate** (1 task, 0.25 vCPU, 0.5 GB): ~$15-30/month
+- **Application Load Balancer**: ~$16/month
+- **NAT Gateway**: ~$32/month
+- **CloudWatch Logs** (7-day retention): Minimal
+- **Data Transfer**: Varies by usage
+
+**Estimated Total**: ~$60-80/month
+
+**To avoid costs**: Run `pnpm destroy` when done.
+
+## Cleanup
+
+Destroy all resources:
+
+```bash
+# From this directory
+pnpm destroy
+
+# Or from repository root
+pnpm cdk:destroy
+
+# Confirm deletion when prompted
+```
+
+This will delete:
+- ECS service and tasks
+- Application Load Balancer
+- VPC and all networking resources
+- CloudWatch log groups
+- ECR repository and images
+- Secrets Manager secret (if created by CDK)
+
+## Multi-Environment Deployment
+
+Deploy to multiple environments:
+
+```bash
+# Development
+pnpm deploy --context environment=dev
+
+# Staging
+pnpm deploy --context environment=staging
+
+# Production
+pnpm deploy --context environment=prod
+```
+
+Each environment gets:
+- Separate CloudFormation stack
+- Isolated ECS cluster
+- Separate log groups
+- Separate secrets
 
 ## CDK Commands
 
 ```bash
 # Synthesize CloudFormation template
-npm run synth
+pnpm synth
 
-# Show difference between deployed and local
-npm run diff
+# Show what will change
+pnpm diff
 
 # Deploy stack
-npm run deploy
+pnpm deploy
 
-# Destroy all resources (WARNING: Deletes everything!)
-npm run destroy
+# List all stacks
+pnpm cdk list
+
+# Destroy stack
+pnpm destroy
 ```
-
-## Environment Variables & Customization
-
-You can customize the deployment using CDK context:
-
-```bash
-cdk deploy \
-  --context environment=prod \
-  --context datadogSite=datadoghq.eu \
-  --context datadogApiKey=your-key
-```
-
-Available context parameters:
-- `environment`: Environment name (dev, staging, prod) - default: dev
-- `datadogApiKey`: Your Datadog API key
-- `datadogSite`: Datadog site (datadoghq.com, datadoghq.eu, etc.) - default: datadoghq.com
-
-Infrastructure parameters (edit `bin/app.ts` to change):
-- `desiredCount`: Number of tasks (default: 1)
-- `cpu`: Task CPU (default: 256)
-- `memory`: Task memory in MB (default: 512)
-
-## Monitoring in Datadog
-
-After deployment, monitor your application in Datadog:
-
-1. **APM & Services**: Navigate to APM → Services → `test-datadog-crud-api`
-2. **Traces**: View distributed traces with full request flow
-3. **Logs**: Filter by `service:test-datadog-crud-api`
-4. **Infrastructure**: View ECS tasks and containers
-5. **Container Map**: Visualize your container infrastructure
-
-## Auto Scaling Configuration
-
-The stack is configured with auto scaling:
-
-- **Min Tasks**: 1
-- **Max Tasks**: 4
-- **CPU Target**: 70%
-- **Memory Target**: 80%
-- **Scale Out Cooldown**: 60 seconds
-- **Scale In Cooldown**: 60 seconds
-
-To test auto scaling, generate load on your application.
-
-## Costs
-
-This infrastructure will incur AWS costs:
-
-- **ECS Fargate**: ~$15-30/month (1 task, 0.25 vCPU, 0.5 GB RAM)
-- **Application Load Balancer**: ~$16/month
-- **NAT Gateway**: ~$32/month
-- **CloudWatch Logs**: Minimal (with 7-day retention)
-- **Data Transfer**: Varies by usage
-
-**Estimated monthly cost**: $60-80 for learning/development
-
-## Cleanup
-
-To delete all resources and stop incurring costs:
-
-```bash
-# Delete the stack
-cdk destroy
-
-# Confirm deletion
-# Type 'y' when prompted
-```
-
-**Note**: ECR images are automatically deleted due to `autoDeleteImages: true` in the stack.
 
 ## Troubleshooting
 
-### Task fails to start
+### Deploy Fails
 
-Check the task logs:
+Check CloudFormation events in AWS Console:
+- https://console.aws.amazon.com/cloudformation
+
+### Task Won't Start
+
 ```bash
+# Check task logs
 aws logs tail /ecs/test-datadog-crud-api-dev --follow
 aws logs tail /ecs/datadog-agent-dev --follow
+
+# Describe tasks
+aws ecs describe-tasks \
+  --cluster datadog-test-cluster-dev \
+  --tasks <task-id>
 ```
 
-### Health check failures
+### No Data in Datadog
 
-1. Verify application is listening on port 3000
-2. Check `/health` endpoint returns 200
-3. Ensure security groups allow ALB → ECS traffic
+1. Check Datadog API key in Secrets Manager
+2. Verify `DD_SITE` matches your Datadog region
+3. Check agent logs for connection errors
 
-### No data in Datadog
-
-1. Verify Datadog API key is correct in Secrets Manager
-2. Check Datadog agent logs for connection issues
-3. Ensure `DD_SITE` matches your Datadog account region
-
-### Image not found
-
-Make sure you've built and pushed the Docker image to ECR before deploying the service.
+See **[Troubleshooting Guide](../../docs/troubleshooting.md)** for complete troubleshooting documentation.
 
 ## Security Best Practices
 
 For production deployments, consider:
 
-1. **HTTPS**: Add ACM certificate and HTTPS listener to ALB
-2. **Secrets Rotation**: Enable automatic rotation for Datadog API key
-3. **VPC Endpoints**: Add VPC endpoints for ECR, CloudWatch to avoid NAT costs
-4. **IAM Policies**: Review and minimize IAM permissions
+1. **HTTPS**: Add ACM certificate and HTTPS listener
+2. **Secrets Rotation**: Enable automatic Datadog API key rotation
+3. **VPC Endpoints**: Add VPC endpoints for ECR, CloudWatch to reduce NAT costs
+4. **IAM Policies**: Follow principle of least privilege
 5. **WAF**: Add AWS WAF to protect the ALB
-6. **Remove Removal Policies**: Change `RemovalPolicy.DESTROY` to `RETAIN` for logs
+6. **Logging**: Enable ALB access logs
+7. **Retention**: Change `RemovalPolicy.DESTROY` to `RETAIN` for critical resources
 
-## Project Structure
+## Learn More
 
-```
-cdk/
-├── bin/
-│   └── app.ts              # CDK app entry point
-├── lib/
-│   └── datadog-app-stack.ts # Main infrastructure stack
-├── cdk.json                # CDK configuration
-├── package.json            # Dependencies
-├── tsconfig.json           # TypeScript config
-└── README.md               # This file
-```
-
-## Support
-
-For issues related to:
-- **AWS Infrastructure**: Check CloudFormation events in AWS Console
-- **Datadog Integration**: Visit https://docs.datadoghq.com/
-- **Application Code**: See main project README
+- **[Deployment Guide](../../docs/deployment.md)** - Complete deployment instructions
+- **[Architecture Guide](../../docs/architecture.md)** - System architecture
+- **[Monitoring Guide](../../docs/monitoring.md)** - Monitor your deployment
+- **[Main README](../../README.md)** - Monorepo overview
+- **[AWS CDK Documentation](https://docs.aws.amazon.com/cdk/)** - Official CDK docs
 
 ## License
 

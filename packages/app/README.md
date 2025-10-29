@@ -1,169 +1,51 @@
-# Test Datadog CRUD API
+# Application Package
 
-A TypeScript-based REST API with full Datadog integration for APM, logging, and tracing. This application includes scenario simulation capabilities to test various monitoring scenarios in Datadog, perfect for practicing site reliability engineering.
+TypeScript REST API with comprehensive Datadog observability integration (APM, tracing, logging).
+
+## Overview
+
+This package contains the application code for the Datadog Observability Playground. It's a REST API built with Express.js that demonstrates Datadog monitoring capabilities including APM, distributed tracing, structured logging, and runtime metrics.
 
 ## Features
 
 - **CRUD Operations**: Full Create, Read, Update, Delete operations for products
 - **Datadog Integration**:
   - APM (Application Performance Monitoring)
-  - Distributed Tracing
-  - Log Injection with trace correlation
-  - Runtime Metrics
+  - Distributed Tracing with dd-trace
+  - Structured JSON logging with Pino
+  - Log-trace correlation with trace ID injection
+  - Runtime Metrics (CPU, memory, event loop)
   - Continuous Profiling
-- **Scenario Simulation**: Test different application states
-  - Client errors (400)
-  - Internal server errors (500)
-  - Long latency (5 seconds)
-  - Random latency (100ms - 3s)
-  - Timeout scenarios (30 seconds)
-- **ECS Ready**: Includes Docker and AWS ECS deployment configurations
-- **Production Best Practices**: TypeScript, structured logging, health checks, graceful shutdown
+- **Scenario Simulation**: Test different application states (errors, latency, timeouts)
+- **Production Best Practices**: TypeScript, health checks, graceful shutdown
 
 ## Quick Start
 
 ### From Monorepo Root
 
 ```bash
-# Install dependencies (from repo root)
+# Install dependencies
 pnpm install
 
 # Run in development mode
 pnpm dev
+```
 
-# Or run from this directory
-cd packages/app
+### From This Directory
+
+```bash
+# Install dependencies (if not already done from root)
+pnpm install
+
+# Run in development mode
 pnpm dev
 ```
 
-### Local Development Options
-
-#### Option 1: Docker Compose (Recommended)
+### Docker Compose (Recommended)
 
 ```bash
 export DD_API_KEY=your-datadog-api-key
 docker-compose up
-```
-
-#### Option 2: Local Node.js + Dockerized Agent
-
-```bash
-# Start Datadog agent
-docker run -d --name datadog-agent \
-  -e DD_API_KEY=your-key \
-  -e DD_SITE=datadoghq.com \
-  -e DD_APM_ENABLED=true \
-  -e DD_APM_NON_LOCAL_TRAFFIC=true \
-  -p 8126:8126 -p 8125:8125/udp \
-  gcr.io/datadoghq/agent:latest
-
-# Run application
-pnpm dev
-```
-
-
-## Environment Variables
-
-Create a `.env` file (see `.env.example`):
-
-```bash
-# Application
-PORT=3000
-NODE_ENV=development
-
-# Datadog
-DD_SERVICE=test-datadog-crud-api
-DD_ENV=dev
-DD_VERSION=1.0.0
-DD_AGENT_HOST=localhost  # or datadog-agent for Docker
-DD_TRACE_AGENT_PORT=8126
-```
-
-## API Endpoints
-
-### Health Check
-```bash
-GET /health
-```
-
-### Products CRUD
-
-All endpoints support scenario simulation via query parameter:
-
-#### Get All Products
-```bash
-GET /api/products
-GET /api/products?scenario=long-latency
-```
-
-#### Get Product by ID
-```bash
-GET /api/products/:id
-GET /api/products/1?scenario=random-latency
-```
-
-#### Create Product
-```bash
-POST /api/products
-Content-Type: application/json
-
-{
-  "name": "New Product",
-  "price": 99.99,
-  "category": "Electronics",
-  "stock": 100
-}
-```
-
-#### Update Product
-```bash
-PUT /api/products/:id
-Content-Type: application/json
-
-{
-  "name": "Updated Product",
-  "price": 149.99
-}
-```
-
-#### Delete Product
-```bash
-DELETE /api/products/:id
-```
-
-## Scenario Simulation
-
-Add `?scenario=<type>` to any `/api/*` endpoint to simulate different states:
-
-| Scenario | Description | Example |
-|----------|-------------|---------|
-| `normal` | No delay (default) | `/api/products?scenario=normal` |
-| `error` | 400 Bad Request | `/api/products?scenario=error` |
-| `internal-error` | 500 Internal Server Error | `/api/products?scenario=internal-error` |
-| `long-latency` | 5 second delay | `/api/products?scenario=long-latency` |
-| `random-latency` | Random 100ms-3s delay | `/api/products?scenario=random-latency` |
-| `timeout` | 30 second delay | `/api/products?scenario=timeout` |
-
-## Testing Scenarios
-
-```bash
-# Normal request
-curl http://localhost:3000/api/products
-
-# Trigger error
-curl http://localhost:3000/api/products?scenario=error
-
-# Trigger internal error
-curl http://localhost:3000/api/products?scenario=internal-error
-
-# Test latency
-curl http://localhost:3000/api/products?scenario=long-latency
-
-# Random latency
-curl http://localhost:3000/api/products?scenario=random-latency
-
-# Test batch requests
-./test-scenarios.sh
 ```
 
 ## Project Structure
@@ -171,20 +53,20 @@ curl http://localhost:3000/api/products?scenario=random-latency
 ```
 packages/app/
 ├── src/
-│   ├── app.ts                      # Express app configuration
-│   ├── server.ts                   # Server entry point
-│   ├── index.ts                    # Main entry (starts server)
-│   ├── tracer.ts                   # Datadog tracer initialization
-│   ├── logger.ts                   # Custom logger with DD integration
-│   ├── data.ts                     # Static product data
+│   ├── index.ts                  # Entry point (loads tracer first!)
+│   ├── tracer.ts                 # Datadog tracer initialization
+│   ├── logger.ts                 # Pino logger with DD integration
+│   ├── app.ts                    # Express app configuration
+│   ├── server.ts                 # HTTP server
+│   ├── data.ts                   # In-memory product data
 │   ├── routes/
-│   │   └── products.ts             # Product CRUD routes
+│   │   └── products.ts           # Product CRUD routes
 │   └── utils/
-│       └── scenarioSimulator.ts    # Scenario simulation middleware
-├── Dockerfile                      # Multi-stage Docker build
-├── docker-compose.yml              # Local development with Datadog agent
-├── package.json                    # Dependencies and scripts
-└── tsconfig.json                   # TypeScript configuration
+│       └── scenarioSimulator.ts  # Scenario simulation middleware
+├── Dockerfile                    # Multi-stage Docker build
+├── docker-compose.yml            # Local development environment
+├── package.json                  # Dependencies and scripts
+└── README.md                     # This file
 ```
 
 ## Available Scripts
@@ -202,13 +84,90 @@ pnpm start            # Run compiled JavaScript
 pnpm start:local      # Run with ts-node (no build)
 ```
 
-## Docker Build
+## Documentation
+
+For detailed documentation, see the main docs directory:
+
+- **[Getting Started Guide](../../docs/getting-started.md)** - Initial setup and first run
+- **[Local Development Guide](../../docs/local-development.md)** - Development workflows
+- **[API Reference](../../docs/api-reference.md)** - Complete API documentation
+- **[Testing Guide](../../docs/testing.md)** - Testing scenarios and load generation
+- **[Monitoring Guide](../../docs/monitoring.md)** - Datadog observability
+- **[Troubleshooting](../../docs/troubleshooting.md)** - Common issues
+
+## API Endpoints
+
+### Health Check
 
 ```bash
-# Build image
-docker build -t test-datadog-crud-api:latest .
+GET /health
+```
 
-# Run container
+### Products CRUD
+
+All endpoints support scenario simulation via `?scenario=<type>` query parameter.
+
+```bash
+GET    /api/products       # List all products
+GET    /api/products/:id   # Get product by ID
+POST   /api/products       # Create new product
+PUT    /api/products/:id   # Update product
+DELETE /api/products/:id   # Delete product
+```
+
+See **[API Reference](../../docs/api-reference.md)** for detailed endpoint documentation.
+
+## Scenario Simulation
+
+Test different application states by adding `?scenario=<type>` to any `/api/*` endpoint:
+
+| Scenario | Description | Example |
+|----------|-------------|---------|
+| `normal` | No delay (default) | `?scenario=normal` |
+| `error` | 400 Bad Request | `?scenario=error` |
+| `internal-error` | 500 Internal Server Error | `?scenario=internal-error` |
+| `long-latency` | 5 second delay | `?scenario=long-latency` |
+| `random-latency` | Random 100ms-3s delay | `?scenario=random-latency` |
+| `timeout` | 30 second delay | `?scenario=timeout` |
+
+**Example**:
+```bash
+curl http://localhost:3000/api/products?scenario=long-latency
+```
+
+See **[Testing Guide](../../docs/testing.md)** for comprehensive testing examples.
+
+## Environment Variables
+
+Create a `.env` file in this directory:
+
+```bash
+# Application
+PORT=3000
+NODE_ENV=development
+
+# Datadog
+DD_SERVICE=test-datadog-crud-api
+DD_ENV=local
+DD_VERSION=1.0.0
+DD_AGENT_HOST=localhost          # Use 'datadog-agent' for Docker Compose
+DD_TRACE_AGENT_PORT=8126
+DD_LOGS_INJECTION=true
+DD_RUNTIME_METRICS_ENABLED=true
+DD_PROFILING_ENABLED=true
+```
+
+## Docker
+
+### Build Image
+
+```bash
+docker build -t test-datadog-crud-api:latest .
+```
+
+### Run Container
+
+```bash
 docker run -d \
   -p 3000:3000 \
   -e DD_AGENT_HOST=host.docker.internal \
@@ -216,76 +175,81 @@ docker run -d \
   test-datadog-crud-api:latest
 ```
 
-## Monitoring in Datadog
-
-After deployment, explore these Datadog features:
-
-1. **APM → Services**: Navigate to APM → Services → `test-datadog-crud-api`
-2. **Traces**: View distributed traces with full request flow
-3. **Logs**: Filter by `service:test-datadog-crud-api`
-4. **Metrics**: Analyze latency percentiles (p50, p75, p95, p99)
-5. **Profiling**: View CPU and memory profiling data
-
-### Practice Scenarios
-
-Generate traffic to test monitoring:
+### Docker Compose
 
 ```bash
-# Normal traffic
-for i in {1..100}; do curl http://localhost:3000/api/products; done
-
-# Generate errors
-for i in {1..50}; do curl http://localhost:3000/api/products?scenario=error; done
-
-# Generate latency issues
-for i in {1..20}; do curl http://localhost:3000/api/products?scenario=long-latency & done
+export DD_API_KEY=your-datadog-api-key
+docker-compose up
 ```
+
+## Monitoring
+
+After running the application, view telemetry in Datadog:
+
+- **APM → Services**: https://app.datadoghq.com/apm/services
+- **Traces**: https://app.datadoghq.com/apm/traces
+- **Logs**: https://app.datadoghq.com/logs
+- **Infrastructure**: https://app.datadoghq.com/infrastructure
+
+Filter by: `service:test-datadog-crud-api`
+
+See **[Monitoring Guide](../../docs/monitoring.md)** for detailed Datadog usage.
+
+## Architecture
+
+### Key Components
+
+1. **Tracer** (`tracer.ts`): Initializes Datadog APM (must load first!)
+2. **Logger** (`logger.ts`): Structured logging with trace correlation
+3. **Express App** (`app.ts`): REST API with middleware stack
+4. **Scenario Simulator** (`scenarioSimulator.ts`): Testing middleware
+5. **Data Layer** (`data.ts`): In-memory product storage
+
+### Request Flow
+
+```
+Request → Express → Tracer → Logger → Simulator → Route → Data → Response
+```
+
+See **[Architecture Guide](../../docs/architecture.md)** for detailed system design.
 
 ## Troubleshooting
 
-### Datadog Agent Not Receiving Data
-
-**Docker Compose:**
-```bash
-docker-compose exec datadog-agent agent status
-```
-
-**Standalone Docker:**
-```bash
-docker logs datadog-agent
-```
-
-### No Traces Appearing
-
-1. Verify tracer initialization happens first (check `src/index.ts`)
-2. Check environment variables are set correctly
-3. Verify agent is reachable: `DD_AGENT_HOST` and `DD_TRACE_AGENT_PORT`
-4. Check agent logs for connection errors
-
-### Build Errors
+### Application Won't Start
 
 ```bash
-# Clean and rebuild
+# Clean and reinstall
 rm -rf node_modules dist
 pnpm install
 pnpm build
 ```
 
+### No Data in Datadog
+
+```bash
+# Check agent status
+docker exec datadog-agent agent status
+
+# Enable debug logging
+export DD_TRACE_DEBUG=true
+pnpm dev
+```
+
 ### Port Already in Use
 
 ```bash
-# Stop containers
-docker-compose down
-
-# Or kill process on port 3000
-lsof -ti:3000 | xargs kill -9
+# Find and kill process using port 3000
+lsof -i :3000
+kill -9 <PID>
 ```
 
-## Additional Documentation
+See **[Troubleshooting Guide](../../docs/troubleshooting.md)** for complete troubleshooting documentation.
 
-- **[GETTING_STARTED.md](GETTING_STARTED.md)**: Comprehensive getting started guide
-- **[QUICKSTART.md](QUICKSTART.md)**: Quick reference for common tasks
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)**: API and command reference
+## Learn More
+
+- **[Main README](../../README.md)** - Monorepo overview
+- **[CDK Package](../cdk/README.md)** - Infrastructure package
+- **[Datadog Documentation](https://docs.datadoghq.com/)** - Official Datadog docs
 
 ## License
 

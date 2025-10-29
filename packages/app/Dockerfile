@@ -1,29 +1,35 @@
 # Multi-stage build for optimized image size
 FROM node:20-alpine AS builder
 
+# Enable corepack to use pnpm
+RUN corepack enable
+
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json ./
 COPY tsconfig.json ./
 
 # Install dependencies
-RUN npm ci
+RUN pnpm install --frozen-lockfile || pnpm install
 
 # Copy source code
 COPY src ./src
 
 # Build TypeScript
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM node:20-alpine
 
+# Enable corepack to use pnpm
+RUN corepack enable
+
 WORKDIR /app
 
 # Copy package files and install production dependencies only
-COPY package*.json ./
-RUN npm ci --only=production
+COPY package.json ./
+RUN pnpm install --prod --frozen-lockfile || pnpm install --prod
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist

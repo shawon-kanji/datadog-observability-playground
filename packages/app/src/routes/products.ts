@@ -1,6 +1,7 @@
 import { Router, Request, Response, type IRouter } from 'express';
 import { products, Product } from '../data';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../logger';
 
 const router: IRouter = Router();
 
@@ -9,7 +10,7 @@ const router: IRouter = Router();
  * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  */
 router.get('/', (req: Request, res: Response) => {
-  console.log('Fetching all products', { query: req.query });
+  logger.info('Fetching all products', { query: req.query });
 
   res.json({
     success: true,
@@ -24,7 +25,7 @@ router.get('/', (req: Request, res: Response) => {
  */
 router.get('/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  console.log('Fetching product by ID', { id, query: req.query });
+  logger.info('Fetching product by ID', { id, query: req.query });
 
   const product = products.find(p => p.id === id);
 
@@ -48,7 +49,7 @@ router.get('/:id', (req: Request, res: Response) => {
  */
 router.post('/', (req: Request, res: Response) => {
   const { name, price, category, stock } = req.body;
-  console.log('Creating new product', { body: req.body, query: req.query });
+  logger.info('Creating new product', { body: req.body, query: req.query });
 
   if (!name || !price || !category || stock === undefined) {
     return res.status(400).json({
@@ -83,7 +84,7 @@ router.post('/', (req: Request, res: Response) => {
 router.put('/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, price, category, stock } = req.body;
-  console.log('Updating product', { id, body: req.body, query: req.query });
+  logger.info('Updating product', { id, body: req.body, query: req.query });
 
   const productIndex = products.findIndex(p => p.id === id);
 
@@ -114,7 +115,7 @@ router.put('/:id', (req: Request, res: Response) => {
  */
 router.delete('/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  console.log('Deleting product', { id, query: req.query });
+  logger.info('Deleting product', { id, query: req.query });
 
   const productIndex = products.findIndex(p => p.id === id);
 

@@ -12,15 +12,15 @@ const server = app.listen(PORT, () => {
     datadogEnabled: true
   });
 
-  console.log(`\n🚀 Server is running on port ${PORT}`);
-  console.log(`📊 Datadog APM is enabled`);
-  console.log(`\nAvailable scenarios (add as query parameter):`);
-  console.log(`  - ?scenario=error          (400 Bad Request)`);
-  console.log(`  - ?scenario=internal-error (500 Internal Error)`);
-  console.log(`  - ?scenario=long-latency   (5 second delay)`);
-  console.log(`  - ?scenario=random-latency (random 100ms-3s delay)`);
-  console.log(`  - ?scenario=timeout        (30 second delay)`);
-  console.log(`  - ?scenario=normal         (no delay)\n`);
+  logger.info(`Server is running on port ${PORT}`);
+  logger.info('Datadog APM is enabled');
+  logger.info('Available scenarios (add as query parameter)');
+  logger.info('  - ?scenario=error          (400 Bad Request)');
+  logger.info('  - ?scenario=internal-error (500 Internal Error)');
+  logger.info('  - ?scenario=long-latency   (5 second delay)');
+  logger.info('  - ?scenario=random-latency (random 100ms-3s delay)');
+  logger.info('  - ?scenario=timeout        (30 second delay)');
+  logger.info('  - ?scenario=normal         (no delay)');
 });
 
 // Graceful shutdown

@@ -1,35 +1,31 @@
 /**
- * Custom logger with Datadog integration
- * Logs are automatically enriched with trace context for correlation
+ * Standardized application logger
+ * Outputs JSON-formatted logs to stdout with trace context for APM correlation
  */
+import pino from 'pino';
 import tracer from 'dd-trace';
 
-interface LogLevel {
-  INFO: string;
-  WARN: string;
-  ERROR: string;
-  DEBUG: string;
-}
-
-const LOG_LEVELS: LogLevel = {
-  INFO: 'info',
-  WARN: 'warn',
-  ERROR: 'error',
-  DEBUG: 'debug'
-};
-
 class Logger {
-  private service: string;
-  private env: string;
+  private pinoLogger: pino.Logger;
 
   constructor() {
-    this.service = process.env.DD_SERVICE || 'test-datadog-crud-api';
-    this.env = process.env.DD_ENV || 'development';
+    const service = process.env.DD_SERVICE || 'test-datadog-crud-api';
+    const env = process.env.DD_ENV || 'development';
+
+    this.pinoLogger = pino({
+      level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+      base: {
+        service,
+        env,
+      },
+      mixin: () => this.getTraceContext(),
+      timestamp: pino.stdTimeFunctions.isoTime,
+    });
   }
 
   /**
    * Get current trace context from dd-trace
-   * This enables log-trace correlation in Datadog
+   * This enables log-trace correlation in APM platforms
    */
   private getTraceContext() {
     const span = tracer.scope().active();
@@ -45,28 +41,12 @@ class Logger {
     return {};
   }
 
-  private formatLog(level: string, message: string, context?: any) {
-    const traceContext = this.getTraceContext();
-
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      level,
-      service: this.service,
-      env: this.env,
-      message,
-      ...traceContext, // Add trace_id and span_id for correlation
-      ...(context && { context })
-    };
-
-    return JSON.stringify(logEntry);
-  }
-
   info(message: string, context?: any) {
-    console.log(this.formatLog(LOG_LEVELS.INFO, message, context));
+    this.pinoLogger.info(context || {}, message);
   }
 
   warn(message: string, context?: any) {
-    console.warn(this.formatLog(LOG_LEVELS.WARN, message, context));
+    this.pinoLogger.warn(context || {}, message);
   }
 
   error(message: string, error?: Error, context?: any) {
@@ -81,13 +61,11 @@ class Logger {
       })
     };
 
-    console.error(this.formatLog(LOG_LEVELS.ERROR, message, errorContext));
+    this.pinoLogger.error(errorContext, message);
   }
 
   debug(message: string, context?: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.debug(this.formatLog(LOG_LEVELS.DEBUG, message, context));
-    }
+    this.pinoLogger.debug(context || {}, message);
   }
 }
 

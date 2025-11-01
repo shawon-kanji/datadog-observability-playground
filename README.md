@@ -90,7 +90,8 @@ datadog-observability-playground/
 - **AWS ECS Fargate**: Serverless container deployment
 - **Application Load Balancer**: Public-facing HTTP load balancer
 - **Auto-Scaling**: CPU/memory-based scaling (1-4 tasks)
-- **CloudWatch Integration**: Centralized logging
+- **FireLens Log Forwarding**: Direct log streaming from ECS to Datadog
+- **CloudWatch Integration**: Centralized logging for infrastructure components
 - **Secrets Management**: Secure Datadog API key storage
 - **Infrastructure as Code**: Full AWS CDK TypeScript implementation
 

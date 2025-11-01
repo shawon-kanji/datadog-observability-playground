@@ -15,12 +15,19 @@ Deploy the Datadog Observability Playground to AWS ECS Fargate using AWS CDK.
 The deployment creates:
 - **VPC**: Multi-AZ with public and private subnets
 - **ECS Cluster**: Fargate cluster with Container Insights
-- **ECS Service**: Application with Datadog agent sidecar
+- **ECS Service**: Application with Datadog agent sidecar and FireLens log router
+- **FireLens Integration**: Fluent Bit log router for direct log forwarding to Datadog
 - **Application Load Balancer**: Public-facing HTTP load balancer
 - **ECR Repository**: Container image storage
-- **CloudWatch Log Groups**: Centralized logging
+- **CloudWatch Log Groups**: Logging for infrastructure components (FireLens, Datadog Agent)
 - **Secrets Manager**: Secure Datadog API key storage
 - **Auto Scaling**: CPU/memory-based scaling (1-4 tasks)
+
+**Log Flow**:
+- Application logs → FireLens (Fluent Bit) → Datadog Logs API (direct)
+- Infrastructure logs (FireLens, Agent) → CloudWatch Log Groups
+- APM traces → Datadog Agent → Datadog APM
+- Metrics → Datadog Agent → Datadog Metrics
 
 ## Step 1: Configure AWS CLI
 
@@ -197,11 +204,16 @@ aws ecs list-tasks \
   --region us-east-1
 ```
 
-### View Application Logs
+### View Logs
 
+**Application Logs**: Application logs are sent directly to Datadog via FireLens, so check Datadog Logs UI:
+- Navigate to Datadog → Logs
+- Filter by `service:test-datadog-crud-api env:dev`
+
+**Infrastructure Component Logs** (FireLens, Datadog Agent):
 ```bash
-# Application logs
-aws logs tail /ecs/test-datadog-crud-api-dev --follow
+# FireLens log router logs
+aws logs tail /ecs/firelens-dev --follow
 
 # Datadog agent logs
 aws logs tail /ecs/datadog-agent-dev --follow

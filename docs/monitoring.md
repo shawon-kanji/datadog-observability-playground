@@ -121,6 +121,21 @@ Each span shows:
 
 ## 3. Logging
 
+### Log Forwarding Architecture
+
+**Local Development**:
+- Logs → stdout → Datadog Agent → Datadog Logs
+
+**AWS ECS Deployment**:
+- Logs → stdout → FireLens (Fluent Bit) → Datadog Logs API (direct)
+- **Benefit**: Lower latency, reduced CloudWatch costs, better performance
+
+**FireLens** automatically:
+- Forwards logs directly to Datadog
+- Maintains trace ID correlation
+- Adds metadata (service, env, source)
+- Handles retries and buffering
+
 ### Log Explorer
 
 **Access**: Logs → Log Explorer

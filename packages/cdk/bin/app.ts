@@ -11,7 +11,7 @@ const datadogApiKey = app.node.tryGetContext('datadogApiKey');
 const datadogSite = app.node.tryGetContext('datadogSite') || 'datadoghq.com';
 
 // Deployment region and account from environment variables or use defaults
-const region = process.env.CDK_DEFAULT_REGION || 'us-east-1';
+const region = process.env.CDK_DEFAULT_REGION || 'ap-southeast-1';
 const account = process.env.CDK_DEFAULT_ACCOUNT;
 
 new DatadogAppStack(app, `DatadogAppStack-${environment}`, {

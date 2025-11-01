@@ -10,7 +10,8 @@ This package contains Infrastructure as Code using AWS CDK (TypeScript) to deplo
 - **Application Load Balancer** for public access
 - **VPC** with public and private subnets
 - **ECR repository** for Docker images
-- **CloudWatch log groups** for centralized logging
+- **FireLens log router** for direct log forwarding to Datadog
+- **CloudWatch log groups** for infrastructure component logging
 - **Secrets Manager** for secure Datadog API key storage
 - **Auto-scaling** configuration (1-4 tasks based on CPU/memory)
 
@@ -24,7 +25,27 @@ This package contains Infrastructure as Code using AWS CDK (TypeScript) to deplo
 - Docker installed
 - Datadog account and API key
 
-### Deploy
+### **IMPORTANT: Deployment Order**
+
+⚠️ **Before deploying the full stack**, you must complete these steps in order:
+
+#### Step 1: Create Datadog API Key Secret
+
+Either pass the API key via context OR create the secret manually:
+
+```bash
+# Option 1: Pass via context when deploying (see below)
+pnpm deploy --context datadogApiKey=your-datadog-api-key
+
+# Option 2: Create secret manually (recommended for production)
+aws secretsmanager create-secret \
+  --name datadog-api-key-dev \
+  --description "Datadog API Key for development environment" \
+  --secret-string "your-datadog-api-key" \
+  --region ap-southeast-1
+```
+
+#### Step 2: Deploy Infrastructure (Creates ECR Repository)
 
 ```bash
 # From monorepo root
@@ -34,12 +55,76 @@ pnpm install
 cd packages/cdk
 pnpm cdk bootstrap
 
-# Deploy infrastructure
+# Deploy infrastructure (this creates ECR but won't start ECS tasks yet)
 pnpm deploy --context datadogApiKey=your-datadog-api-key
 
-# Or from repository root
-pnpm cdk:deploy --context datadogApiKey=your-key
+# The deployment will create the ECR repository but WILL FAIL on first run
+# because no Docker image exists yet. This is expected!
 ```
+
+#### Step 3: Build and Push Docker Image to ECR
+
+**EASY WAY - Use the deployment script:**
+
+```bash
+# From repository root - this handles everything!
+pnpm deploy
+```
+
+**MANUAL WAY:**
+
+```bash
+# Get ECR URI from CDK outputs
+ECR_URI=$(aws cloudformation describe-stacks \
+  --stack-name DatadogAppStack-dev \
+  --query 'Stacks[0].Outputs[?OutputKey==`EcrRepositoryUri`].OutputValue' \
+  --output text)
+
+# Build and push the application image
+cd ../app
+docker build -t test-datadog-crud-api:latest .
+
+# Login to ECR
+aws ecr get-login-password --region ap-southeast-1 | \
+  docker login --username AWS --password-stdin $ECR_URI
+
+# Tag and push
+docker tag test-datadog-crud-api:latest $ECR_URI:latest
+docker push $ECR_URI:latest
+```
+
+#### Step 4: Re-deploy Stack (Now with Image Available)
+
+```bash
+# Now that the image exists, deploy again
+cd ../cdk
+pnpm deploy
+```
+
+## Deployment Scripts (Recommended)
+
+We provide automated deployment scripts that handle building, pushing, and deploying in one command:
+
+```bash
+# Full deployment with validation
+pnpm deploy              # Deploy to dev environment
+pnpm deploy:prod         # Deploy to prod environment
+
+# Quick deployment (faster, no wait)
+pnpm deploy:quick
+
+# Check deployment status
+./scripts/status.sh dev
+
+# Rollback to previous version
+./scripts/rollback.sh dev <image-tag>
+```
+
+See [scripts/README.md](../../scripts/README.md) for detailed documentation.
+
+**The stack now includes validation checks that will fail if:**
+1. ❌ Datadog secret doesn't exist in Secrets Manager (when not provided via context)
+2. ❌ ECR repository doesn't have a 'latest' tagged image
 
 See **[Deployment Guide](../../docs/deployment.md)** for complete deployment instructions.
 
@@ -72,6 +157,7 @@ packages/cdk/
 - ECS service with task definition
 - Application container (from ECR)
 - Datadog agent sidecar container
+- FireLens log router (Fluent Bit) for log forwarding
 - Auto-scaling (1-4 tasks)
 
 **Load Balancing**:
@@ -81,7 +167,8 @@ packages/cdk/
 
 **Storage & Logging**:
 - ECR repository for Docker images
-- CloudWatch log groups (7-day retention)
+- FireLens with Fluent Bit for direct log forwarding to Datadog
+- CloudWatch log groups (7-day retention) for FireLens and infrastructure logs
 
 **Security**:
 - Secrets Manager for Datadog API key
@@ -89,6 +176,43 @@ packages/cdk/
 - Security groups for ALB and ECS
 
 See **[Architecture Guide](../../docs/architecture.md)** for detailed system design.
+
+### Log Forwarding Architecture
+
+**FireLens Integration**:
+
+The stack uses AWS FireLens with Fluent Bit to forward application logs directly to Datadog, bypassing CloudWatch for application logs. This provides several benefits:
+
+**Why FireLens?**
+- **Direct Forwarding**: Logs go straight from the application to Datadog without intermediate storage
+- **Lower Latency**: Reduced lag between log generation and availability in Datadog
+- **Cost Optimization**: Reduces CloudWatch Logs ingestion and storage costs
+- **Better Performance**: Dedicated log router container handles log processing
+- **Native Datadog Support**: Fluent Bit has built-in Datadog output plugin
+
+**Architecture**:
+```
+Application Container
+  └─> stdout/stderr
+      └─> FireLens (Fluent Bit)
+          └─> Datadog Logs API (direct)
+
+Infrastructure Components (FireLens, Datadog Agent)
+  └─> CloudWatch Logs (for monitoring the monitoring!)
+```
+
+**What Goes Where**:
+- **Application logs** → FireLens → Datadog (structured JSON with trace correlation)
+- **FireLens logs** → CloudWatch (to monitor the log router itself)
+- **Datadog Agent logs** → CloudWatch (to monitor the agent)
+- **APM traces** → Datadog Agent → Datadog APM
+- **Metrics** → Datadog Agent → Datadog Metrics
+
+**FireLens Configuration** (`datadog-app-stack.ts:278-335`):
+- Uses `amazon/aws-for-fluent-bit` image
+- Configured with Datadog output plugin
+- Automatic trace ID injection for log-trace correlation
+- Secure API key handling via Secrets Manager
 
 ## Available Scripts
 
@@ -312,6 +436,59 @@ pnpm destroy
 ```
 
 ## Troubleshooting
+
+### ValidationError: Secret Not Found
+
+**Error**: `Secrets Manager can't find the specified secret`
+
+**Solution**: Create the secret before deploying:
+
+```bash
+aws secretsmanager create-secret \
+  --name datadog-api-key-dev \
+  --secret-string "your-datadog-api-key" \
+  --region ap-southeast-1
+```
+
+Or pass the API key via context:
+
+```bash
+pnpm deploy -- --context datadogApiKey=your-key
+```
+
+### ValidationError: ECR Image Not Found
+
+**Error**: `ImageNotFoundException` or `RepositoryNotFoundException`
+
+**Solution**: Build and push your Docker image first:
+
+```bash
+# Get ECR URI from outputs
+ECR_URI=$(aws cloudformation describe-stacks \
+  --stack-name DatadogAppStack-dev \
+  --query 'Stacks[0].Outputs[?OutputKey==`EcrRepositoryUri`].OutputValue' \
+  --output text)
+
+# Build and push
+cd packages/app
+docker build -t test-datadog-crud-api:latest .
+aws ecr get-login-password --region ap-southeast-1 | \
+  docker login --username AWS --password-stdin $ECR_URI
+docker tag test-datadog-crud-api:latest $ECR_URI:latest
+docker push $ECR_URI:latest
+```
+
+### ResourceInitializationError: Unable to Pull Secrets
+
+**Error**: `execution resource retrieval failed: unable to retrieve secret from asm`
+
+**Cause**: Task execution role doesn't have permission to read secrets
+
+**Solution**: This is now fixed in the code. Redeploy the stack:
+
+```bash
+pnpm deploy
+```
 
 ### Deploy Fails
 

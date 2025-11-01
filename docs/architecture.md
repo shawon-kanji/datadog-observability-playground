@@ -229,35 +229,48 @@ interface Product {
                 │  Port 3000     │
                 └───────┬────────┘
                         │
-          ┌─────────────┴─────────────────────────-┐
-          │          ECS Fargate Service           │
-          │                                        │
-          │  ┌──────────────────────────────────┐  │
-          │  │  Task Definition                 │  │
-          │  │                                  │  │
-          │  │  ┌────────────────────────────┐  │  │
-          │  │  │  App Container             │  │  │
-          │  │  │  - Node.js app             │  │  │
-          │  │  │  - Port 3000               │  │  │
-          │  │  │  - ECR image               │  │  │
-          │  │  └────────────────────────────┘  │  │
-          │  │                                  │  │
-          │  │  ┌────────────────────────────┐  │  │
-          │  │  │  Datadog Agent Sidecar     │  │  │
-          │  │  │  - Port 8126 (APM)         │  │  │
-          │  │  │  - Port 8125 (StatsD)      │  │  │
-          │  │  │  - API key from Secrets    │  │  │
-          │  │  └────────────────────────────┘  │  │
-          │  └──────────────────────────────────┘  │
-          └────────────────────────────────────────┘
+          ┌─────────────┴──────────────────────────────────┐
+          │          ECS Fargate Service                   │
+          │                                                │
+          │  ┌──────────────────────────────────────────┐  │
+          │  │  Task Definition (3 containers)          │  │
+          │  │                                          │  │
+          │  │  ┌────────────────────────────────────┐  │  │
+          │  │  │  App Container                     │  │  │
+          │  │  │  - Node.js app                     │  │  │
+          │  │  │  - Port 3000                       │  │  │
+          │  │  │  - Logs → stdout/stderr            │  │  │
+          │  │  └───────────┬────────────────────────┘  │  │
+          │  │              │ logs via FireLens          │  │
+          │  │              ↓                             │  │
+          │  │  ┌────────────────────────────────────┐  │  │
+          │  │  │  FireLens Log Router               │  │  │
+          │  │  │  - Fluent Bit                      │  │  │
+          │  │  │  - Routes logs to Datadog          │  │  │
+          │  │  └───────────┬────────────────────────┘  │  │
+          │  │              │                             │  │
+          │  │  ┌────────────────────────────────────┐  │  │
+          │  │  │  Datadog Agent Sidecar             │  │  │
+          │  │  │  - Port 8126 (APM traces)          │  │  │
+          │  │  │  - Port 8125 (StatsD metrics)      │  │  │
+          │  │  │  - API key from Secrets Manager    │  │  │
+          │  │  └────────────────────────────────────┘  │  │
+          │  └──────────────────────────────────────────┘  │
+          └─────────────────────────────────────────────────┘
+                        │                     │
+                        │                     │ App Logs (JSON)
+                        │                     ↓
+                        │            ┌───────────────────┐
+                        │            │  Datadog Logs API │
+                        │            └───────────────────┘
                         │
-                        │ Logs
+                        │ Infrastructure Logs (FireLens, Agent)
                         ↓
-          ┌─────────────────────────┐
-          │  CloudWatch Log Groups  │
-          │  - /ecs/app-dev         │
-          │  - /ecs/agent-dev       │
-          └─────────────────────────┘
+          ┌──────────────────────────────┐
+          │  CloudWatch Log Groups       │
+          │  - /ecs/firelens-dev         │
+          │  - /ecs/datadog-agent-dev    │
+          └──────────────────────────────┘
 ```
 
 ### AWS Infrastructure Components
@@ -271,7 +284,7 @@ interface Product {
 **Compute**:
 - ECS Fargate cluster
 - ECS service with desired count = 1
-- Task definition (app + agent containers)
+- Task definition (app + agent + FireLens log router containers)
 - Auto-scaling: 1-4 tasks based on CPU/memory
 
 **Load Balancing**:
@@ -280,9 +293,10 @@ interface Product {
 - Health check: `/health` endpoint
 - Security group: Allow HTTP from internet
 
-**Storage**:
+**Storage & Logging**:
 - ECR repository for Docker images
-- CloudWatch log groups (7-day retention)
+- FireLens (Fluent Bit) for direct log forwarding to Datadog
+- CloudWatch log groups (7-day retention) for infrastructure component logs
 
 **Security**:
 - Secrets Manager for Datadog API key
@@ -327,22 +341,32 @@ interface Product {
 
 **Traces**:
 ```
-App (dd-trace) → Agent (port 8126) → Datadog APM
+App (dd-trace) → Datadog Agent (port 8126) → Datadog APM
 ```
 
-**Logs**:
+**Logs** (via FireLens):
 ```
-App (Pino) → stdout → Agent → Datadog Logs
+App (Pino) → stdout/stderr → FireLens (Fluent Bit) → Datadog Logs API
+                                │
+                                └→ CloudWatch (FireLens own logs)
 ```
+
+**Why FireLens for Logs?**
+- **Direct Forwarding**: Logs sent directly to Datadog, bypassing CloudWatch for app logs
+- **Lower Latency**: Faster log availability in Datadog
+- **Cost Efficiency**: Reduces CloudWatch Logs ingestion and storage costs
+- **Better Performance**: Dedicated container for log processing
+- **Native Integration**: Fluent Bit has built-in Datadog output plugin
+- **Trace Correlation**: Automatic trace ID injection maintained
 
 **Metrics**:
 ```
-App (dd-trace runtime) → Agent (port 8125) → Datadog Metrics
+App (dd-trace runtime) → Datadog Agent (port 8125) → Datadog Metrics
 ```
 
 **Infrastructure**:
 ```
-Agent → System metrics → Datadog Infrastructure
+Datadog Agent → ECS metadata + system metrics → Datadog Infrastructure
 ```
 
 ## Observability Strategy

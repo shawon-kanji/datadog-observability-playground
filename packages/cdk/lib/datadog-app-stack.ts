@@ -7,7 +7,23 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as cr from 'aws-cdk-lib/custom-resources';
 
+/**
+ * Prerequisites before deploying this stack:
+ *
+ * 1. Datadog API Key Secret:
+ *    - Either provide 'datadogApiKey' in stack props, OR
+ *    - Create the secret manually:
+ *      aws secretsmanager create-secret \
+ *        --name datadog-api-key-{environment} \
+ *        --secret-string "your-api-key" \
+ *        --region {region}
+ *
+ * 2. ECR Image:
+ *    - Build and push your application image to ECR with 'latest' tag
+ *    - The stack will validate that the image exists before deployment
+ */
 export interface DatadogAppStackProps extends cdk.StackProps {
   /**
    * Environment name (e.g., dev, staging, prod)
@@ -16,7 +32,8 @@ export interface DatadogAppStackProps extends cdk.StackProps {
 
   /**
    * Datadog API key (will be stored in Secrets Manager)
-   * If not provided, you must manually create the secret
+   * If not provided, the secret must already exist in Secrets Manager
+   * with name: datadog-api-key-{environment}
    */
   datadogApiKey?: string;
 
@@ -42,14 +59,14 @@ export interface DatadogAppStackProps extends cdk.StackProps {
 }
 
 export class DatadogAppStack extends cdk.Stack {
-  public readonly ecrRepository: ecr.Repository;
+  public readonly ecrRepository: ecr.IRepository;
   public readonly loadBalancerUrl: cdk.CfnOutput;
 
   constructor(scope: Construct, id: string, props?: DatadogAppStackProps) {
     super(scope, id, props);
 
     const envName = props?.environment || 'dev';
-    const datadogSite = props?.datadogSite || 'datadoghq.com';
+    const datadogSite = 'ap2.datadoghq.com';
     const desiredCount = props?.desiredCount || 1;
     const cpu = props?.cpu || 256;
     const memory = props?.memory || 512;
@@ -77,36 +94,57 @@ export class DatadogAppStack extends cdk.Stack {
     // ========================================
     // ECR Repository
     // ========================================
-    this.ecrRepository = new ecr.Repository(this, 'AppRepository', {
-      repositoryName: 'test-datadog-crud-api',
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For learning - change to RETAIN for production
-      autoDeleteImages: true, // For learning - remove for production
-      imageScanOnPush: true,
-      lifecycleRules: [
-        {
-          description: 'Keep last 5 images',
-          maxImageCount: 5,
-        },
-      ],
-    });
+    // Reference existing ECR repository instead of creating new one
+    this.ecrRepository = ecr.Repository.fromRepositoryName(
+      this,
+      'AppRepository',
+      'test-datadog-crud-api'
+    );
 
     // ========================================
     // Secrets Manager - Datadog API Key
     // ========================================
     let datadogApiKeySecret: secretsmanager.ISecret;
+    const secretName = `datadog-api-key-${envName}`;
 
     if (props?.datadogApiKey) {
       datadogApiKeySecret = new secretsmanager.Secret(this, 'DatadogApiKey', {
-        secretName: `datadog-api-key-${envName}`,
+        secretName,
         description: 'Datadog API Key for APM and logging',
         secretStringValue: cdk.SecretValue.unsafePlainText(props.datadogApiKey),
       });
     } else {
-      // Import existing secret or create placeholder
-      datadogApiKeySecret = secretsmanager.Secret.fromSecretNameV2(
+      // Get the complete ARN of the existing secret
+      const getSecretArn = new cr.AwsCustomResource(this, 'GetDatadogSecretArn', {
+        onCreate: {
+          service: 'SecretsManager',
+          action: 'describeSecret',
+          parameters: {
+            SecretId: secretName,
+          },
+          physicalResourceId: cr.PhysicalResourceId.of('DatadogSecretArnLookup'),
+        },
+        onUpdate: {
+          service: 'SecretsManager',
+          action: 'describeSecret',
+          parameters: {
+            SecretId: secretName,
+          },
+          physicalResourceId: cr.PhysicalResourceId.of('DatadogSecretArnLookup'),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+          resources: [
+            `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${secretName}*`,
+          ],
+        }),
+      });
+
+      // Import existing secret using the complete ARN (including the 6-char suffix)
+      const secretArn = getSecretArn.getResponseField('ARN');
+      datadogApiKeySecret = secretsmanager.Secret.fromSecretCompleteArn(
         this,
         'DatadogApiKey',
-        `datadog-api-key-${envName}`
+        secretArn
       );
     }
 
@@ -135,6 +173,24 @@ export class DatadogAppStack extends cdk.Stack {
     });
 
     // ========================================
+    // Validate ECR Repository has images
+    // ========================================
+    const validateEcrImages = new cr.AwsCustomResource(this, 'ValidateEcrImages', {
+      onCreate: {
+        service: 'ECR',
+        action: 'describeImages',
+        parameters: {
+          repositoryName: this.ecrRepository.repositoryName,
+          imageIds: [{ imageTag: 'latest' }],
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('EcrImageValidation'),
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [this.ecrRepository.repositoryArn],
+      }),
+    });
+
+    // ========================================
     // ECS Task Definition
     // ========================================
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'AppTaskDef', {
@@ -144,12 +200,35 @@ export class DatadogAppStack extends cdk.Stack {
     });
 
     // Grant permissions to read Datadog API key
-    datadogApiKeySecret.grantRead(taskDefinition.taskRole);
+    if (taskDefinition.executionRole) {
+      datadogApiKeySecret.grantRead(taskDefinition.executionRole);
+    }
+
+    // Grant Datadog agent permissions to collect ECS metadata and logs
+    if (taskDefinition.taskRole) {
+      taskDefinition.taskRole.addToPrincipalPolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'ecs:ListClusters',
+          'ecs:ListContainerInstances',
+          'ecs:DescribeContainerInstances',
+          'ecs:DescribeTasks',
+          'ecs:DescribeTaskDefinition',
+          'ecs:ListTasks',
+          'ecs:ListServices',
+          'ecs:DescribeServices',
+          'ec2:DescribeInstances',
+          'ec2:DescribeRegions',
+          'ec2:DescribeAvailabilityZones',
+        ],
+        resources: ['*'],
+      }));
+    }
 
     // Datadog Agent Sidecar Container
     const datadogAgentContainer = taskDefinition.addContainer('DatadogAgent', {
       containerName: 'datadog-agent',
-      image: ecs.ContainerImage.fromRegistry('public.ecr.aws/datadog/agent:latest'),
+      image: ecs.ContainerImage.fromRegistry('gcr.io/datadoghq/agent:7'),
       cpu: 128,
       memoryLimitMiB: 256,
       essential: true,
@@ -159,6 +238,13 @@ export class DatadogAppStack extends cdk.Stack {
         DD_APM_NON_LOCAL_TRAFFIC: 'true',
         ECS_FARGATE: 'true',
         DD_DOGSTATSD_NON_LOCAL_TRAFFIC: 'true',
+        // Enable ECS metadata and tagging
+        DD_ECS_COLLECT_RESOURCE_TAGS_EC2: 'true',
+        DD_DOCKER_LABELS_AS_TAGS: '{"*":"%%label%%"}',
+        DD_CHECKS_TAG_CARDINALITY: 'orchestrator',
+        DD_DOGSTATSD_TAG_CARDINALITY: 'orchestrator',
+        // Enhanced tags for better visibility
+        DD_TAGS: `env:${envName} service:test-datadog-crud-api cluster:datadog-test-cluster-${envName} task_family:test-datadog-crud-api-${envName}`,
       },
       secrets: {
         DD_API_KEY: ecs.Secret.fromSecretsManager(datadogApiKeySecret),
@@ -172,7 +258,7 @@ export class DatadogAppStack extends cdk.Stack {
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,
-        startPeriod: cdk.Duration.seconds(60),
+        startPeriod: cdk.Duration.seconds(15), // Datadog recommends 15s
       },
     });
 
@@ -184,6 +270,25 @@ export class DatadogAppStack extends cdk.Stack {
     datadogAgentContainer.addPortMappings({
       containerPort: 8125,
       protocol: ecs.Protocol.UDP,
+    });
+
+    // ========================================
+    // FireLens Log Router (for Fargate log collection)
+    // ========================================
+    const logRouterContainer = taskDefinition.addFirelensLogRouter('LogRouter', {
+      image: ecs.ContainerImage.fromRegistry('amazon/aws-for-fluent-bit:latest'),
+      firelensConfig: {
+        type: ecs.FirelensLogRouterType.FLUENTBIT,
+      },
+      logging: ecs.LogDriver.awsLogs({
+        streamPrefix: 'firelens',
+        logGroup: new logs.LogGroup(this, 'FirelensLogGroup', {
+          logGroupName: `/ecs/firelens-${envName}`,
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      }),
+      memoryReservationMiB: 50,
     });
 
     // Application Container
@@ -204,13 +309,32 @@ export class DatadogAppStack extends cdk.Stack {
         DD_LOGS_INJECTION: 'true',
         DD_RUNTIME_METRICS_ENABLED: 'true',
         DD_PROFILING_ENABLED: 'true',
+        DD_TRACE_ANALYTICS_ENABLED: 'true',
+        DD_TRACE_SAMPLE_RATE: '1', // Sample all traces for learning
+        // Add unified service tagging
+        DD_TAGS: `env:${envName},version:1.0.0,cluster:datadog-test-cluster-${envName}`,
       },
-      logging: ecs.LogDriver.awsLogs({
-        streamPrefix: 'app',
-        logGroup: appLogGroup,
+      dockerLabels: {
+        'com.datadoghq.tags.env': envName,
+        'com.datadoghq.tags.service': 'test-datadog-crud-api',
+        'com.datadoghq.tags.version': '1.0.0',
+      },
+      logging: new ecs.FireLensLogDriver({
+        options: {
+          Name: 'datadog',
+          Host: `http-intake.logs.${datadogSite}`,
+          TLS: 'on',
+          dd_service: 'test-datadog-crud-api',
+          dd_source: 'nodejs',
+          dd_tags: `env:${envName},version:1.0.0`,
+          provider: 'ecs',
+        },
+        secretOptions: {
+          apikey: ecs.Secret.fromSecretsManager(datadogApiKeySecret),
+        },
       }),
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3000/health || exit 1'],
+        command: ['CMD-SHELL', 'node -e "require(\'http\').get(\'http://localhost:3000/health\', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"'],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 3,
@@ -229,6 +353,9 @@ export class DatadogAppStack extends cdk.Stack {
       container: datadogAgentContainer,
       condition: ecs.ContainerDependencyCondition.HEALTHY,
     });
+
+    // Ensure ECR image exists before task definition is used
+    taskDefinition.node.addDependency(validateEcrImages);
 
     // ========================================
     // Application Load Balancer
@@ -306,10 +433,22 @@ export class DatadogAppStack extends cdk.Stack {
       healthCheckGracePeriod: cdk.Duration.seconds(60),
       minHealthyPercent: 50,
       maxHealthyPercent: 200,
+      // Enable ECS managed tags for Datadog to collect
+      enableECSManagedTags: true,
+      propagateTags: ecs.PropagatedTagSource.SERVICE,
     });
 
-    // Attach service to target group
-    service.attachToApplicationTargetGroup(targetGroup);
+    // Add tags to the service (will propagate to tasks)
+    cdk.Tags.of(service).add('Environment', envName);
+    cdk.Tags.of(service).add('Service', 'test-datadog-crud-api');
+    cdk.Tags.of(service).add('ManagedBy', 'CDK');
+    cdk.Tags.of(service).add('Region', this.region);
+
+    // Attach service to target group - explicitly specify the app container
+    targetGroup.addTarget(service.loadBalancerTarget({
+      containerName: 'app',
+      containerPort: 3000,
+    }));
 
     // Auto Scaling (optional but useful for learning)
     const scaling = service.autoScaleTaskCount({

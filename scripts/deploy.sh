@@ -4,18 +4,29 @@
 # Docker Build & Push + CDK Deploy Script
 # ========================================
 # This script builds the Docker image, pushes to ECR, and deploys via CDK
-# Usage: ./scripts/deploy.sh [environment]
-# Example: ./scripts/deploy.sh dev
+# Usage: ./scripts/deploy.sh [environment] [cicd=true|false]
+# Example: ./scripts/deploy.sh dev cicd=false
+#          ./scripts/deploy.sh prod cicd=true
 
 set -e  # Exit on any error
 
 # ========================================
-# Configuration
+# Parse Arguments
 # ========================================
 ENVIRONMENT="${1:-dev}"
-AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+CICD_MODE="false"
 ECR_REPOSITORY_NAME="test-datadog-crud-api"
 APP_DIR="packages/app"
+
+# Parse arguments for cicd parameter
+for arg in "$@"; do
+    case $arg in
+        cicd=*)
+            CICD_MODE="${arg#*=}"
+            shift
+            ;;
+    esac
+done
 
 # Modern color palette
 RESET='\033[0m'
@@ -93,12 +104,193 @@ print_box() {
 }
 
 # ========================================
-# Validation
+# Region Selection Function
+# ========================================
+select_region() {
+    echo ""
+    log_info "Available AWS regions:"
+    echo ""
+
+    # Common AWS regions with descriptions
+    echo -e "  ${CYAN}1)${RESET}  ap-southeast-1 (Singapore)"
+    echo -e "  ${CYAN}2)${RESET}  ap-southeast-2 (Sydney)"
+    echo -e "  ${CYAN}3)${RESET}  ap-northeast-1 (Tokyo)"
+    echo -e "  ${CYAN}4)${RESET}  ap-northeast-2 (Seoul)"
+    echo -e "  ${CYAN}5)${RESET}  ap-south-1 (Mumbai)"
+    echo -e "  ${CYAN}6)${RESET}  us-east-1 (N. Virginia)"
+    echo -e "  ${CYAN}7)${RESET}  us-east-2 (Ohio)"
+    echo -e "  ${CYAN}8)${RESET}  us-west-1 (N. California)"
+    echo -e "  ${CYAN}9)${RESET}  us-west-2 (Oregon)"
+    echo -e "  ${CYAN}10)${RESET} eu-west-1 (Ireland)"
+    echo -e "  ${CYAN}11)${RESET} eu-west-2 (London)"
+    echo -e "  ${CYAN}12)${RESET} eu-central-1 (Frankfurt)"
+    echo -e "  ${CYAN}13)${RESET} ca-central-1 (Canada)"
+    echo -e "  ${CYAN}14)${RESET} sa-east-1 (São Paulo)"
+
+    echo ""
+    read -p "$(echo -e "${YELLOW}❯${RESET} Enter region number (1-14): ")" REGION_NUMBER
+
+    # Validate input is a number
+    if ! [[ "$REGION_NUMBER" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid input. Please enter a number."
+        exit 1
+    fi
+
+    # Map number to region code
+    case $REGION_NUMBER in
+        1) SELECTED_REGION="ap-southeast-1" ;;
+        2) SELECTED_REGION="ap-southeast-2" ;;
+        3) SELECTED_REGION="ap-northeast-1" ;;
+        4) SELECTED_REGION="ap-northeast-2" ;;
+        5) SELECTED_REGION="ap-south-1" ;;
+        6) SELECTED_REGION="us-east-1" ;;
+        7) SELECTED_REGION="us-east-2" ;;
+        8) SELECTED_REGION="us-west-1" ;;
+        9) SELECTED_REGION="us-west-2" ;;
+        10) SELECTED_REGION="eu-west-1" ;;
+        11) SELECTED_REGION="eu-west-2" ;;
+        12) SELECTED_REGION="eu-central-1" ;;
+        13) SELECTED_REGION="ca-central-1" ;;
+        14) SELECTED_REGION="sa-east-1" ;;
+        *)
+            log_error "Invalid selection. Please choose a number between 1 and 14."
+            exit 1
+            ;;
+    esac
+
+    log_success "Selected region: ${BOLD}${SELECTED_REGION}${RESET}"
+    echo "$SELECTED_REGION"
+    return 0
+}
+
+# ========================================
+# AWS Profile & Region Configuration
 # ========================================
 print_header "🚀 Datadog Observability Deployment"
-log_info "Environment: ${BOLD}${BRIGHT_CYAN}${ENVIRONMENT}${RESET}"
-log_info "Region: ${BOLD}${BRIGHT_CYAN}${AWS_REGION}${RESET}"
+
+# Get current AWS profile (or default)
+CURRENT_PROFILE="${AWS_PROFILE:-$(aws configure list | grep profile | awk '{print $2}' || echo 'default')}"
+CURRENT_REGION="${AWS_REGION:-$(aws configure get region --profile "$CURRENT_PROFILE" 2>/dev/null || echo 'ap-southeast-1')}"
+
+if [ "$CICD_MODE" = "true" ]; then
+    # CI/CD Mode: Display info only, no interaction
+    log_info "Mode: ${BOLD}${BRIGHT_MAGENTA}CI/CD${RESET} (non-interactive)"
+    log_info "AWS Profile: ${BOLD}${BRIGHT_CYAN}${CURRENT_PROFILE}${RESET}"
+    log_info "AWS Region: ${BOLD}${BRIGHT_CYAN}${CURRENT_REGION}${RESET}"
+    log_info "Environment: ${BOLD}${BRIGHT_CYAN}${ENVIRONMENT}${RESET}"
+
+    # Verify credentials work
+    if ! aws sts get-caller-identity --profile "$CURRENT_PROFILE" &>/dev/null; then
+        log_error "AWS credentials validation failed for profile: $CURRENT_PROFILE"
+        exit 1
+    fi
+    log_success "AWS credentials validated"
+
+    # Set for rest of script
+    export AWS_PROFILE="$CURRENT_PROFILE"
+    export AWS_REGION="$CURRENT_REGION"
+else
+    # Local Mode: Interactive profile selection
+    log_info "Mode: ${BOLD}${BRIGHT_MAGENTA}Local${RESET} (interactive)"
+    echo ""
+    log_info "Current AWS Profile: ${BOLD}${BRIGHT_CYAN}${CURRENT_PROFILE}${RESET}"
+    log_info "Current AWS Region: ${BOLD}${BRIGHT_CYAN}${CURRENT_REGION}${RESET}"
+    log_info "Target Environment: ${BOLD}${BRIGHT_CYAN}${ENVIRONMENT}${RESET}"
+    echo ""
+
+    # Ask for confirmation
+    read -p "$(echo -e "${YELLOW}❯${RESET} Use current profile and region? (y/n): ")" -n 1 -r
+    echo ""
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        # User wants to change
+        echo ""
+        log_info "Available AWS profiles:"
+        echo ""
+
+        # Get profiles and display with numbers
+        PROFILE_LIST=$(aws configure list-profiles 2>/dev/null)
+
+        if [ -z "$PROFILE_LIST" ]; then
+            log_error "No AWS profiles found. Run 'aws configure' to set one up."
+            exit 1
+        fi
+
+        # Display profiles with numbers
+        counter=1
+        while IFS= read -r profile; do
+            echo -e "  ${CYAN}${counter})${RESET} $profile"
+            counter=$((counter + 1))
+        done <<< "$PROFILE_LIST"
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}❯${RESET} Enter profile number: ")" PROFILE_NUMBER
+
+        # Validate input is a number
+        if ! [[ "$PROFILE_NUMBER" =~ ^[0-9]+$ ]]; then
+            log_error "Invalid input. Please enter a number."
+            exit 1
+        fi
+
+        # Get the selected profile
+        NEW_PROFILE=$(echo "$PROFILE_LIST" | sed -n "${PROFILE_NUMBER}p")
+
+        if [ -z "$NEW_PROFILE" ]; then
+            log_error "Invalid selection. Please choose a valid profile number."
+            exit 1
+        fi
+
+        log_success "Selected profile: ${BOLD}${NEW_PROFILE}${RESET}"
+
+        # Get region for the profile or ask
+        PROFILE_REGION=$(aws configure get region --profile "$NEW_PROFILE" 2>/dev/null || echo "")
+
+        echo ""
+        if [ -n "$PROFILE_REGION" ]; then
+            log_info "Profile '${NEW_PROFILE}' default region: ${BOLD}${PROFILE_REGION}${RESET}"
+            read -p "$(echo -e "${YELLOW}❯${RESET} Keep this region? (y/n): ")" -n 1 -r
+            echo ""
+
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                # Keep the profile's region
+                log_success "Using region: ${BOLD}${PROFILE_REGION}${RESET}"
+            else
+                # Show region selection menu
+                PROFILE_REGION=$(select_region)
+            fi
+        else
+            # No default region, show selection menu
+            log_info "No default region configured for this profile"
+            PROFILE_REGION=$(select_region)
+        fi
+
+        CURRENT_PROFILE="$NEW_PROFILE"
+        CURRENT_REGION="$PROFILE_REGION"
+
+        echo ""
+        log_success "Profile set to: ${BOLD}${CURRENT_PROFILE}${RESET}"
+        log_success "Region set to: ${BOLD}${CURRENT_REGION}${RESET}"
+    fi
+
+    # Set for rest of script
+    export AWS_PROFILE="$CURRENT_PROFILE"
+    export AWS_REGION="$CURRENT_REGION"
+
+    # Verify credentials work
+    echo ""
+    log_progress "Validating AWS credentials..."
+    if ! aws sts get-caller-identity --profile "$CURRENT_PROFILE" &>/dev/null; then
+        log_error "AWS credentials validation failed for profile: $CURRENT_PROFILE"
+        exit 1
+    fi
+    log_success "AWS credentials validated"
+fi
+
 print_separator
+
+# ========================================
+# Validation
+# ========================================
 
 # Check if AWS CLI is installed
 if ! command -v aws &> /dev/null; then
@@ -124,15 +316,34 @@ if [ ! -d "$APP_DIR" ]; then
     exit 1
 fi
 
-# Get AWS Account ID
-print_step "Validating AWS Credentials"
-log_progress "Fetching AWS account information..."
+# Get AWS Account ID (already validated above, just fetch)
+print_step "Fetching AWS Account Information"
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 if [ -z "$AWS_ACCOUNT_ID" ]; then
     log_error "Failed to get AWS account ID. Please check your AWS credentials."
     exit 1
 fi
+AWS_USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
 log_success "AWS Account: ${BOLD}$AWS_ACCOUNT_ID${RESET}"
+log_info "User/Role: ${DIM}$AWS_USER_ARN${RESET}"
+
+# ========================================
+# DEBUG MODE - Exit before deployment
+# ========================================
+echo ""
+echo -e "${BRIGHT_GREEN}${BOLD}✓ Profile and region selection completed successfully!${RESET}"
+echo ""
+echo -e "${BRIGHT_CYAN}${BOLD}Configuration Summary:${RESET}"
+echo -e "  ${DIM}AWS Profile:${RESET}  ${BRIGHT_CYAN}${BOLD}${AWS_PROFILE}${RESET}"
+echo -e "  ${DIM}AWS Region:${RESET}   ${BRIGHT_CYAN}${BOLD}${AWS_REGION}${RESET}"
+echo -e "  ${DIM}AWS Account:${RESET}  ${BRIGHT_CYAN}${BOLD}${AWS_ACCOUNT_ID}${RESET}"
+echo -e "  ${DIM}User/Role:${RESET}    ${DIM}${AWS_USER_ARN}${RESET}"
+echo -e "  ${DIM}Environment:${RESET}  ${BRIGHT_CYAN}${BOLD}${ENVIRONMENT}${RESET}"
+echo ""
+log_warning "DEBUG MODE: Exiting before actual deployment"
+log_info "Comment out the exit statement in deploy.sh to enable full deployment"
+echo ""
+exit 0
 
 # ========================================
 # ECR Repository URI
@@ -241,6 +452,7 @@ echo -e "${BRIGHT_CYAN}${BOLD}📊 DEPLOYMENT SUMMARY${RESET}"
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
 echo -e "  ${DIM}Environment:${RESET}          ${BRIGHT_CYAN}${BOLD}${ENVIRONMENT}${RESET}"
+echo -e "  ${DIM}AWS Profile:${RESET}          ${BRIGHT_CYAN}${BOLD}${AWS_PROFILE}${RESET}"
 echo -e "  ${DIM}AWS Region:${RESET}           ${BRIGHT_CYAN}${BOLD}${AWS_REGION}${RESET}"
 echo -e "  ${DIM}AWS Account:${RESET}          ${BRIGHT_CYAN}${BOLD}${AWS_ACCOUNT_ID}${RESET}"
 echo -e "  ${DIM}Image Tag:${RESET}            ${BRIGHT_CYAN}${BOLD}${IMAGE_TAG}${RESET}"

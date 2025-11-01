@@ -35,8 +35,64 @@ The deployment creates:
 # Configure AWS credentials
 aws configure
 
+# Or configure a named profile
+aws configure --profile myprofile
+
 # Verify configuration
 aws sts get-caller-identity
+
+# List all configured profiles
+aws configure list-profiles
+```
+
+### AWS Profile Management
+
+The deployment script (`./scripts/deploy.sh`) intelligently handles AWS profile selection:
+
+**Local/Interactive Mode** (default):
+- Displays your current AWS profile and region
+- Asks for confirmation before proceeding
+- Simple numbered selection menus (just type a number)
+  - Profile menu: Shows all configured AWS profiles
+  - Region menu: Displays 14 common AWS regions with location names
+- Perfect for laptop deployments where you might use multiple AWS accounts
+
+**CI/CD Mode** (`cicd=true`):
+- Uses current AWS credentials without prompting
+- Displays configuration for logging purposes
+- Fails fast if credentials are invalid
+- Perfect for automated pipelines
+
+**Examples**:
+```bash
+# Local deployment - interactive mode
+./scripts/deploy.sh dev
+
+# Example interaction:
+# ❯ Use current profile and region? (y/n): n
+#
+# ℹ  Available AWS profiles:
+#
+# 1) default
+# 2) staging
+# 3) production
+#
+# ❯ Enter profile number: 2
+# ✓ Selected profile: staging
+#
+# ℹ  Available AWS regions:
+#
+# 1)  ap-southeast-1 (Singapore)
+# 2)  ap-southeast-2 (Sydney)
+# 3)  ap-northeast-1 (Tokyo)
+# ...
+# 14) sa-east-1 (São Paulo)
+#
+# ❯ Enter region number (1-14): 1
+# ✓ Selected region: ap-southeast-1
+
+# CI/CD deployment - no interaction
+./scripts/deploy.sh prod cicd=true
 ```
 
 ## Step 2: Bootstrap CDK
@@ -470,7 +526,7 @@ Each environment gets isolated:
 
 ## CI/CD Integration
 
-Integrate with CI/CD pipelines:
+Integrate with CI/CD pipelines using the `cicd=true` parameter:
 
 **GitHub Actions Example**:
 ```yaml
@@ -491,22 +547,148 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ap-southeast-1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
       - name: Install dependencies
         run: pnpm install
 
       - name: Build and deploy
         run: |
-          ./deploy-to-aws.sh
+          ./scripts/deploy.sh dev cicd=true
         env:
           DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
 ```
+
+**GitLab CI Example**:
+```yaml
+deploy:
+  stage: deploy
+  image: node:18
+  before_script:
+    - apt-get update && apt-get install -y docker.io awscli
+    - npm install -g pnpm
+    - pnpm install
+  script:
+    - ./scripts/deploy.sh $CI_ENVIRONMENT_NAME cicd=true
+  only:
+    - main
+  environment:
+    name: production
+```
+
+**Key Points for CI/CD**:
+- Always use `cicd=true` to skip interactive prompts
+- Set AWS credentials via environment variables or CI/CD secrets
+- The script will validate credentials and fail fast on errors
+- All configuration is displayed in logs for debugging
+
+## Deployment Script Features
+
+### Interactive Menu System
+
+The `deploy.sh` script provides a simple numbered menu interface for selecting AWS profiles and regions:
+
+**Profile Selection:**
+- Displays all configured AWS profiles from `~/.aws/config`
+- Simple numbered list - just type a number (no typing profile names)
+- Works with all Bash versions (compatible with macOS default Bash 3.2)
+
+**Region Selection:**
+- 14 commonly used AWS regions with friendly location names
+- No need to memorize region codes
+- Clear descriptions (e.g., "1) ap-southeast-1 (Singapore)")
+- Just type a number from 1-14
+
+**Supported Regions:**
+
+| Region Code | Location | Best For |
+|------------|----------|----------|
+| `ap-southeast-1` | Singapore | Asia Pacific hub |
+| `ap-southeast-2` | Sydney | Australia/NZ |
+| `ap-northeast-1` | Tokyo | Japan |
+| `ap-northeast-2` | Seoul | Korea |
+| `ap-south-1` | Mumbai | India |
+| `us-east-1` | N. Virginia | US East (primary) |
+| `us-east-2` | Ohio | US East |
+| `us-west-1` | N. California | US West |
+| `us-west-2` | Oregon | US West (primary) |
+| `eu-west-1` | Ireland | Europe (primary) |
+| `eu-west-2` | London | UK |
+| `eu-central-1` | Frankfurt | Central Europe |
+| `ca-central-1` | Canada | Canada |
+| `sa-east-1` | São Paulo | South America |
+
+### Benefits
+
+**For Local Development:**
+- ✅ **Error-Free**: No typos - just select a number
+- ✅ **Discoverable**: See all available profiles and regions
+- ✅ **User-Friendly**: Region names with locations (not just codes)
+- ✅ **Safe**: Confirms configuration before deployment
+- ✅ **Fast**: Number selection vs typing full names
+
+**For CI/CD:**
+- ✅ **Non-Interactive**: Zero prompts with `cicd=true`
+- ✅ **Fast Fail**: Quick credential validation
+- ✅ **Logged**: Configuration visible in pipeline logs
+- ✅ **Reliable**: Consistent behavior across runs
+
+### Profile Detection Logic
+
+The script detects AWS profile and region in this order:
+
+1. **AWS_PROFILE** environment variable (highest priority)
+2. Current profile from `aws configure list`
+3. Falls back to `default` profile
+
+Region detection:
+1. **AWS_REGION** environment variable (highest priority)
+2. Region configured for the selected profile
+3. Falls back to `ap-southeast-1`
+
+### Testing Modes
+
+**Test Interactive Mode:**
+```bash
+# Test with current profile
+./scripts/deploy.sh dev
+
+# Test profile switching
+./scripts/deploy.sh dev
+# Choose 'n' and select from menu
+```
+
+**Test CI/CD Mode:**
+```bash
+# Test with specific profile
+AWS_PROFILE=staging ./scripts/deploy.sh dev cicd=true
+
+# Test with environment variables (like in pipelines)
+AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=yyy AWS_REGION=us-east-1 ./scripts/deploy.sh prod cicd=true
+```
+
+### Backward Compatibility
+
+The script is **fully backward compatible**:
+- Default behavior is interactive mode (safe for manual use)
+- Respects existing `AWS_PROFILE` and `AWS_REGION` environment variables
+- No breaking changes to existing workflows
+- Can still be used with profile set beforehand:
+  ```bash
+  export AWS_PROFILE=myprofile
+  ./scripts/deploy.sh dev
+  ```
 
 ## Next Steps
 

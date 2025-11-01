@@ -106,9 +106,14 @@ pnpm deploy
 We provide automated deployment scripts that handle building, pushing, and deploying in one command:
 
 ```bash
-# Full deployment with validation
-pnpm deploy              # Deploy to dev environment
-pnpm deploy:prod         # Deploy to prod environment
+# Local deployment (interactive - asks for AWS profile/region confirmation)
+pnpm deploy                    # Deploy to dev environment
+./scripts/deploy.sh dev        # Explicit dev deployment
+./scripts/deploy.sh prod       # Deploy to prod environment
+
+# CI/CD deployment (non-interactive - uses current AWS credentials)
+./scripts/deploy.sh dev cicd=true
+./scripts/deploy.sh prod cicd=true
 
 # Quick deployment (faster, no wait)
 pnpm deploy:quick
@@ -118,6 +123,49 @@ pnpm deploy:quick
 
 # Rollback to previous version
 ./scripts/rollback.sh dev <image-tag>
+```
+
+### AWS Profile Management
+
+The deployment script intelligently handles AWS profiles:
+
+**Local Mode** (`cicd=false` or not specified):
+- Shows current AWS profile and region
+- Asks for confirmation before proceeding
+- Simple numbered menus for profile and region selection (just type a number)
+- Lists all configured AWS profiles
+- Displays 14 common AWS regions with locations
+- Useful for laptop/workstation deployments
+
+**CI/CD Mode** (`cicd=true`):
+- Uses current AWS credentials without interaction
+- Displays profile and region for logging
+- Ideal for automated pipelines (GitHub Actions, GitLab CI, etc.)
+- Validates credentials and exits on failure
+
+**Examples**:
+```bash
+# Local deployment - will prompt for profile confirmation
+./scripts/deploy.sh dev
+
+# When prompted with "Use current profile and region? (y/n):"
+# - Press 'y' to use current settings
+# - Press 'n' to see a numbered menu:
+#   1) default
+#   2) staging
+#   3) production
+#   ❯ Enter profile number: 2
+
+# Then select region from numbered menu:
+#   1)  ap-southeast-1 (Singapore)
+#   2)  ap-southeast-2 (Sydney)
+#   3)  ap-northeast-1 (Tokyo)
+#   ...
+#   14) sa-east-1 (São Paulo)
+#   ❯ Enter region number (1-14): 1
+
+# CI/CD deployment - no prompts, fully automated
+./scripts/deploy.sh prod cicd=true
 ```
 
 See [scripts/README.md](../../scripts/README.md) for detailed documentation.

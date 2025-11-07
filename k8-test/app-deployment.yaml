@@ -18,3 +18,11 @@ spec:
         - name: dd-app-api
           image: "datadog-crud-api:latest"
           imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: ORDER_SERVICE_URL
+              value: "http://order-service:3001"
+

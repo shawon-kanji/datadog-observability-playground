@@ -2,6 +2,7 @@ import { Router, Request, Response, type IRouter } from 'express';
 import { products, Product } from '../data';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../logger';
+import { authenticate } from '../middleware/auth';
 
 const router: IRouter = Router();
 
@@ -46,8 +47,9 @@ router.get('/:id', (req: Request, res: Response) => {
 /**
  * POST /api/products - Create a new product
  * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
+ * Requires authentication
  */
-router.post('/', (req: Request, res: Response) => {
+router.post('/', authenticate, (req: Request, res: Response) => {
   const { name, price, category, stock } = req.body;
   logger.info('Creating new product', { body: req.body, query: req.query });
 
@@ -80,8 +82,9 @@ router.post('/', (req: Request, res: Response) => {
 /**
  * PUT /api/products/:id - Update a product
  * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
+ * Requires authentication
  */
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', authenticate, (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, price, category, stock } = req.body;
   logger.info('Updating product', { id, body: req.body, query: req.query });
@@ -112,8 +115,9 @@ router.put('/:id', (req: Request, res: Response) => {
 /**
  * DELETE /api/products/:id - Delete a product
  * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
+ * Requires authentication
  */
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', authenticate, (req: Request, res: Response) => {
   const { id } = req.params;
   logger.info('Deleting product', { id, query: req.query });
 

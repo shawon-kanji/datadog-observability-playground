@@ -4,10 +4,8 @@ import './tracer';
 import express, { Request, Response, NextFunction, Application } from 'express';
 import cors from 'cors';
 import { logger } from './logger';
-import productRoutes from './routes/products';
 import orderRoutes from './routes/orders';
 import { scenarioSimulator, addScenarioHeaders } from './utils/scenarioSimulator';
-import { authenticate } from './middleware/auth';
 
 const app: Application = express();
 
@@ -43,7 +41,7 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: process.env.DD_SERVICE || 'test-datadog-crud-api',
+    service: process.env.DD_SERVICE || 'order-service',
     version: process.env.DD_VERSION || '1.0.0'
   });
 });
@@ -52,7 +50,6 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/api', scenarioSimulator);
 
 // API Routes
-app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 
 // 404 handler

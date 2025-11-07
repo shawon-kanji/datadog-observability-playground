@@ -1,8 +1,8 @@
 {
-  "name": "@datadog-observability-playground/app",
+  "name": "@datadog-observability-playground/user-service",
   "version": "1.0.0",
   "private": true,
-  "description": "Datadog learning application - TypeScript REST API with APM, tracing, and logging",
+  "description": "User authentication microservice with MongoDB, JWT, and Datadog APM",
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
@@ -12,29 +12,31 @@
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:unit": "jest tests/unit",
-    "test:integration": "jest tests/integration"
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "datadog",
     "observability",
-    "apm",
-    "tracing",
-    "logging"
+    "microservice",
+    "authentication",
+    "mongodb",
+    "jwt"
   ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dd-trace": "^5.73.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.4",
     "pino": "^10.1.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",

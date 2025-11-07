@@ -4,10 +4,8 @@ import './tracer';
 import express, { Request, Response, NextFunction, Application } from 'express';
 import cors from 'cors';
 import { logger } from './logger';
-import productRoutes from './routes/products';
-import orderRoutes from './routes/orders';
-import { scenarioSimulator, addScenarioHeaders } from './utils/scenarioSimulator';
-import { authenticate } from './middleware/auth';
+import authRoutes from './routes/auth';
+import { database } from './config/database';
 
 const app: Application = express();
 
@@ -15,9 +13,6 @@ const app: Application = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Add scenario headers to all responses
-app.use(addScenarioHeaders);
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -30,42 +25,39 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       path: req.path,
       statusCode: res.statusCode,
       duration: `${duration}ms`,
-      scenario: req.query.scenario || 'normal',
-      userAgent: req.get('user-agent')
+      userAgent: req.get('user-agent'),
+      userId: (req as any).userId || 'anonymous',
     });
   });
 
   next();
 });
 
-// Health check endpoint (no scenario simulation)
+// Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: process.env.DD_SERVICE || 'test-datadog-crud-api',
-    version: process.env.DD_VERSION || '1.0.0'
+    service: process.env.DD_SERVICE || 'user-service',
+    version: process.env.DD_VERSION || '1.0.0',
+    database: database.getConnectionStatus() ? 'connected' : 'disconnected',
   });
 });
 
-// Scenario simulator middleware (applies to all /api routes)
-app.use('/api', scenarioSimulator);
-
 // API Routes
-app.use('/api/products', productRoutes);
-app.use('/api/orders', orderRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
   logger.warn('Route not found', {
     method: req.method,
-    path: req.path
+    path: req.path,
   });
 
   res.status(404).json({
     success: false,
     error: 'Route not found',
-    path: req.path
+    path: req.path,
   });
 });
 
@@ -74,14 +66,13 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   logger.error('Unhandled error', err, {
     method: req.method,
     path: req.path,
-    scenario: req.query.scenario
   });
 
   res.status(500).json({
     success: false,
     error: 'Internal Server Error',
     message: err.message,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 

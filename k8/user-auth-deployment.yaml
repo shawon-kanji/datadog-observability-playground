@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind : Deployment
+metadata:
+  name: user-auth-deployment
+  labels:
+    app: user-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-auth
+  template:
+    metadata:
+      labels:
+        app: user-auth
+    spec:
+      containers:
+        - image: "user-service:latest"
+          name: user-auth
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: NODE_ENV
+              value: "development"
+            - name: MONGODB_URI
+              value: "mongodb://mongo-service:27017/user-service"
+            - name: JWT_SECRET
+              value: "your-secret-key-change-in-production"
+            - name: JWT_EXPIRES_IN
+              value: "24h"
+            - name: DD_SERVICE
+              value: "user-service"
+            - name: DD_ENV
+              value: "development"
+            - name: DD_VERSION
+              value: "1.0.0"

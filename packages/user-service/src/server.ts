@@ -1,29 +1,31 @@
 import app from './app';
 import { logger } from './logger';
-import { Database } from './config/database';
+import { database } from './config/database';
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 
-// Connect to database and start server
 async function startServer() {
   try {
     // Connect to MongoDB
-    const db = Database.getInstance();
-    await db.connect();
-    logger.info('Connected to MongoDB');
+    await database.connect();
 
-    // Start Express server
     const server = app.listen(PORT, () => {
       logger.info('Server started', {
         port: PORT,
         env: process.env.DD_ENV || 'development',
-        service: process.env.DD_SERVICE || 'test-datadog-crud-api',
+        service: process.env.DD_SERVICE || 'user-service',
         version: process.env.DD_VERSION || '1.0.0',
-        datadogEnabled: true
+        datadogEnabled: true,
+        mongodbConnected: database.getConnectionStatus(),
       });
 
-      logger.info(`Server is running on port ${PORT}`);
+      logger.info(`User service is running on port ${PORT}`);
       logger.info('Datadog APM is enabled');
+      logger.info('MongoDB connection established');
+      logger.info('Available endpoints:');
+      logger.info('  - POST /api/auth/register (Register new user)');
+      logger.info('  - POST /api/auth/login (Login user)');
+      logger.info('  - GET /api/auth/me (Get current user - requires auth)');
     });
 
     // Graceful shutdown
@@ -33,9 +35,8 @@ async function startServer() {
       server.close(async () => {
         logger.info('Server closed');
 
-        // Disconnect from database
-        await db.disconnect();
-        logger.info('Database disconnected');
+        // Disconnect from MongoDB
+        await database.disconnect();
 
         process.exit(0);
       });
@@ -49,7 +50,6 @@ async function startServer() {
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
   } catch (error) {
     logger.error('Failed to start server', error as Error);
     process.exit(1);
@@ -57,4 +57,3 @@ async function startServer() {
 }
 
 startServer();
-

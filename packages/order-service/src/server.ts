@@ -2,7 +2,7 @@ import app from './app';
 import { logger } from './logger';
 import { Database } from './config/database';
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Connect to database and start server
 async function startServer() {
@@ -17,12 +17,12 @@ async function startServer() {
       logger.info('Server started', {
         port: PORT,
         env: process.env.DD_ENV || 'development',
-        service: process.env.DD_SERVICE || 'test-datadog-crud-api',
+        service: process.env.DD_SERVICE || 'order-service',
         version: process.env.DD_VERSION || '1.0.0',
         datadogEnabled: true
       });
 
-      logger.info(`Server is running on port ${PORT}`);
+      logger.info(`Order service is running on port ${PORT}`);
       logger.info('Datadog APM is enabled');
     });
 
@@ -57,4 +57,3 @@ async function startServer() {
 }
 
 startServer();
-

@@ -6,13 +6,33 @@ import cors from 'cors';
 import { logger } from './logger';
 import productRoutes from './routes/products';
 import orderRoutes from './routes/orders';
+import merchantRoutes from './routes/merchant';
+import purchaseRoutes from './routes/purchase';
 import { scenarioSimulator, addScenarioHeaders } from './utils/scenarioSimulator';
 import { authenticate } from './middleware/auth';
 
 const app: Application = express();
 
+// CORS configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:8080',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002',
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -54,6 +74,8 @@ app.use('/api', scenarioSimulator);
 // API Routes
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/merchant', merchantRoutes);
+app.use('/api/purchase', purchaseRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

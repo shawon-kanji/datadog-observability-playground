@@ -3,10 +3,12 @@
  */
 import jwt from 'jsonwebtoken';
 import { logger } from '../logger';
+import { UserRole } from '../models/User';
 
 export interface TokenPayload {
   userId: string;
   email: string;
+  role: UserRole;
 }
 
 export interface DecodedToken extends TokenPayload {

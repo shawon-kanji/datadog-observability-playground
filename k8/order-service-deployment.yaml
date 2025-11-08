@@ -5,7 +5,7 @@ metadata:
   labels:
     app: order-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: order-service
@@ -25,7 +25,11 @@ spec:
               value: "3001"
             - name: NODE_ENV
               value: "development"
+            - name: MONGODB_URI
+              value: "mongodb://mongo-service:27017/order-service"
             - name: DD_SERVICE
               value: "order-service"
             - name: DD_ENV
               value: "development"
+            - name: DD_VERSION
+              value: "1.0.0"

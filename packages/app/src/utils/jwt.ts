@@ -4,9 +4,16 @@
 import jwt from 'jsonwebtoken';
 import { logger } from '../logger';
 
+export enum UserRole {
+  USER = 'USER',
+  MERCHANT = 'MERCHANT',
+  ADMIN = 'ADMIN'
+}
+
 export interface TokenPayload {
   userId: string;
   email: string;
+  role: UserRole;
 }
 
 export interface DecodedToken extends TokenPayload {

@@ -1,8 +1,11 @@
+export type UserRole = 'USER' | 'MERCHANT' | 'ADMIN';
+
 export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  role: UserRole;
 }
 
 export interface AuthResponse {
@@ -15,12 +18,20 @@ export interface AuthResponse {
 }
 
 export interface Product {
-  id: string;
+  _id: string;
   name: string;
+  description: string;
   price: number;
   category: string;
   stock: number;
+  imageUrl: string;
+  brand?: string;
+  rating?: number;
+  reviewCount?: number;
+  merchantId?: string;
+  merchantName?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductsResponse {
@@ -40,6 +51,7 @@ export interface RegisterData {
   password: string;
   firstName: string;
   lastName: string;
+  role?: UserRole;
 }
 
 export interface LoginData {
@@ -49,14 +61,59 @@ export interface LoginData {
 
 export interface CreateProductData {
   name: string;
+  description: string;
   price: number;
   category: string;
   stock: number;
+  imageUrl: string;
+  brand?: string;
+  rating?: number;
+  reviewCount?: number;
 }
 
 export interface UpdateProductData {
   name?: string;
+  description?: string;
   price?: number;
   category?: string;
   stock?: number;
+  imageUrl?: string;
+  brand?: string;
+  rating?: number;
+  reviewCount?: number;
+}
+
+export interface CartItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  imageUrl: string;
+  merchantId?: string;
+  merchantName?: string;
+}
+
+export interface OrderItem extends CartItem {}
+
+export interface Order {
+  _id: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  items: OrderItem[];
+  totalAmount: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  shippingAddress: string;
+  paymentMethod?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseData {
+  items: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+  shippingAddress: string;
+  paymentMethod?: string;
 }

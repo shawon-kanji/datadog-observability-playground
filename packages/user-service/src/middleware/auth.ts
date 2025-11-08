@@ -4,6 +4,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 import { logger } from '../logger';
+import { UserRole } from '../models/User';
 
 // Extend Express Request type to include user information
 declare global {
@@ -11,6 +12,7 @@ declare global {
     interface Request {
       userId?: string;
       userEmail?: string;
+      userRole?: UserRole;
     }
   }
 }
@@ -57,10 +59,12 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     // Attach user information to request
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
+    req.userRole = decoded.role;
 
     logger.debug('Authentication successful', {
       userId: decoded.userId,
       email: decoded.email,
+      role: decoded.role,
       path: req.path,
     });
 
@@ -99,10 +103,12 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
 
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
+    req.userRole = decoded.role;
 
     logger.debug('Optional authentication successful', {
       userId: decoded.userId,
       email: decoded.email,
+      role: decoded.role,
       path: req.path,
     });
   } catch (error) {
@@ -111,4 +117,47 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
   }
 
   next();
+}
+
+/**
+ * Middleware to require specific roles
+ */
+export function requireRole(...allowedRoles: UserRole[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const userRole = req.userRole;
+
+    if (!userRole) {
+      logger.warn('Authorization failed: No user role found', {
+        path: req.path,
+        method: req.method,
+      });
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+      return;
+    }
+
+    if (!allowedRoles.includes(userRole)) {
+      logger.warn('Authorization failed: Insufficient permissions', {
+        userRole,
+        allowedRoles,
+        path: req.path,
+        method: req.method,
+      });
+      res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions',
+      });
+      return;
+    }
+
+    logger.debug('Authorization successful', {
+      userRole,
+      allowedRoles,
+      path: req.path,
+    });
+
+    next();
+  };
 }

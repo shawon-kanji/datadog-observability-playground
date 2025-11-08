@@ -1,0 +1,108 @@
+version: "3.8"
+
+# Simplified Docker Compose for local development (without Datadog Agent)
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: mongodb-dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-dev-data:/data/db
+    networks:
+      - dev-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # User Service (Authentication)
+  user-service:
+    build:
+      context: ./packages/user-service
+      dockerfile: Dockerfile
+    container_name: user-service-dev
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/user-service
+      - JWT_SECRET=dev-secret-key-for-testing
+      - JWT_EXPIRES_IN=24h
+    depends_on:
+      - mongodb
+    networks:
+      - dev-network
+    restart: unless-stopped
+
+  # Product Service
+  product-service:
+    build:
+      context: ./packages/app
+      dockerfile: Dockerfile
+    container_name: product-service-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/product-service
+      - ORDER_SERVICE_URL=http://order-service:3001
+      - JWT_SECRET=dev-secret-key-for-testing
+    depends_on:
+      - mongodb
+      - order-service
+    networks:
+      - dev-network
+    restart: unless-stopped
+
+  # Order Service
+  order-service:
+    build:
+      context: ./packages/order-service
+      dockerfile: Dockerfile
+    container_name: order-service-dev
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/order-service
+    depends_on:
+      - mongodb
+    networks:
+      - dev-network
+    restart: unless-stopped
+
+  # Frontend (React UI)
+  frontend:
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile.dev
+      args:
+        - VITE_API_BASE_URL=http://localhost:3000
+        - VITE_AUTH_BASE_URL=http://localhost:3002
+    container_name: frontend-dev
+    ports:
+      - "8080:80"
+    depends_on:
+      - product-service
+      - user-service
+    networks:
+      - dev-network
+    restart: unless-stopped
+
+networks:
+  dev-network:
+    name: dev-network
+    driver: bridge
+
+volumes:
+  mongodb-dev-data:
+    driver: local

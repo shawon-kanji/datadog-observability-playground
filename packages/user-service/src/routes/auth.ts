@@ -16,7 +16,7 @@ router.post('/register', async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password, firstName, lastName, role } = req.body;
 
     // Validate required fields
     if (!email || !password || !firstName || !lastName) {
@@ -24,6 +24,15 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: 'All fields are required (email, password, firstName, lastName)',
+      });
+    }
+
+    // Prevent users from self-registering as ADMIN
+    if (role && role === 'ADMIN') {
+      logger.warn('Registration failed: Cannot self-register as ADMIN', { email });
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot register as ADMIN. Please register as USER or MERCHANT.',
       });
     }
 
@@ -37,12 +46,13 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Create new user
+    // Create new user (role can be USER or MERCHANT, defaults to USER)
     const user = new User({
       email,
       password,
       firstName,
       lastName,
+      role, // Optional, defaults to USER in schema
     });
 
     await user.save();
@@ -51,6 +61,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const token = generateToken({
       userId: String(user._id),
       email: user.email,
+      role: user.role,
     });
 
     const duration = Date.now() - startTime;
@@ -69,6 +80,7 @@ router.post('/register', async (req: Request, res: Response) => {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role,
         },
         token,
       },
@@ -136,12 +148,14 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = generateToken({
       userId: String(user._id),
       email: user.email,
+      role: user.role,
     });
 
     const duration = Date.now() - startTime;
     logger.info('User logged in successfully', {
       userId: String(user._id),
       email: user.email,
+      role: user.role,
       duration: `${duration}ms`,
     });
 
@@ -154,6 +168,7 @@ router.post('/login', async (req: Request, res: Response) => {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role,
         },
         token,
       },
@@ -201,6 +216,7 @@ router.get('/me', async (req: Request, res: Response) => {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role,
         },
       },
     });

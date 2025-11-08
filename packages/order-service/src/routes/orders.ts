@@ -1,6 +1,5 @@
 import { Router, Request, Response, type IRouter } from 'express';
-import { orders, Order, OrderItem } from '../data';
-import { v4 as uuidv4 } from 'uuid';
+import { Order } from '../models/Order';
 import { logger } from '../logger';
 
 const router: IRouter = Router();
@@ -8,230 +7,339 @@ const router: IRouter = Router();
 /**
  * GET /api/orders - Get all orders
  * Query params:
- *   - scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  *   - status (pending|processing|shipped|delivered|cancelled)
  *   - customerId
  */
-router.get('/', (req: Request, res: Response) => {
-  const { status, customerId } = req.query;
-  logger.info('Fetching all orders', { query: req.query });
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { status, customerId } = req.query;
+    logger.info('Fetching all orders', { query: req.query });
 
-  let filteredOrders = orders;
+    const filter: any = {};
 
-  // Filter by status if provided
-  if (status) {
-    filteredOrders = filteredOrders.filter(order => order.status === status);
+    // Filter by status if provided
+    if (status) {
+      filter.status = status;
+    }
+
+    // Filter by customerId if provided
+    if (customerId) {
+      filter.customerId = customerId;
+    }
+
+    const orders = await Order.find(filter).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: orders.length,
+      data: orders
+    });
+  } catch (error) {
+    logger.error('Error fetching orders', error as Error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch orders'
+    });
   }
-
-  // Filter by customerId if provided
-  if (customerId) {
-    filteredOrders = filteredOrders.filter(order => order.customerId === customerId);
-  }
-
-  res.json({
-    success: true,
-    count: filteredOrders.length,
-    data: filteredOrders
-  });
 });
 
 /**
  * GET /api/orders/:id - Get order by ID
- * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  */
-router.get('/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  logger.info('Fetching order by ID', { id, query: req.query });
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    logger.info('Fetching order by ID', { id });
 
-  const order = orders.find(o => o.id === id);
+    const order = await Order.findById(id);
 
-  if (!order) {
-    return res.status(404).json({
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+        id
+      });
+    }
+
+    res.json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    logger.error('Error fetching order', error as Error, { id: req.params.id });
+    res.status(500).json({
       success: false,
-      error: 'Order not found',
-      id
+      error: 'Failed to fetch order'
     });
   }
-
-  res.json({
-    success: true,
-    data: order
-  });
 });
 
 /**
  * GET /api/orders/:id/status - Get order status by ID
- * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  */
-router.get('/:id/status', (req: Request, res: Response) => {
-  const { id } = req.params;
-  logger.info('Fetching order status', { id, query: req.query });
+router.get('/:id/status', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    logger.info('Fetching order status', { id });
 
-  const order = orders.find(o => o.id === id);
+    const order = await Order.findById(id).select('status updatedAt');
 
-  if (!order) {
-    return res.status(404).json({
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+        id
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order._id,
+        status: order.status,
+        updatedAt: order.updatedAt
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching order status', error as Error, { id: req.params.id });
+    res.status(500).json({
       success: false,
-      error: 'Order not found',
-      id
+      error: 'Failed to fetch order status'
     });
   }
-
-  res.json({
-    success: true,
-    data: {
-      orderId: order.id,
-      status: order.status,
-      updatedAt: order.updatedAt
-    }
-  });
 });
 
 /**
  * POST /api/orders - Create a new order
- * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
- * Body: { customerId, customerName, items, shippingAddress }
+ * Body: { customerId, customerName, customerEmail, items, shippingAddress, paymentMethod }
  */
-router.post('/', (req: Request, res: Response) => {
-  const { customerId, customerName, items, shippingAddress } = req.body;
-  logger.info('Creating new order', { body: req.body, query: req.query });
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const { customerId, customerName, customerEmail, items, shippingAddress, paymentMethod } = req.body;
+    logger.info('Creating new order', { body: req.body });
 
-  // Validate required fields
-  if (!customerId || !customerName || !items || !Array.isArray(items) || items.length === 0 || !shippingAddress) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing required fields',
-      required: ['customerId', 'customerName', 'items (array)', 'shippingAddress']
-    });
-  }
-
-  // Validate items structure
-  for (const item of items) {
-    if (!item.productId || !item.productName || !item.quantity || !item.price) {
+    // Validate required fields
+    if (!customerId || !customerName || !customerEmail || !items || !Array.isArray(items) || items.length === 0 || !shippingAddress) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid item structure',
-        required: ['productId', 'productName', 'quantity', 'price']
+        error: 'Missing required fields',
+        required: ['customerId', 'customerName', 'customerEmail', 'items (array)', 'shippingAddress']
       });
     }
+
+    // Validate items structure
+    for (const item of items) {
+      if (!item.productId || !item.productName || !item.quantity || item.price === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid item structure',
+          required: ['productId', 'productName', 'quantity', 'price']
+        });
+      }
+    }
+
+    // Calculate total amount
+    const totalAmount = items.reduce((sum: number, item: any) =>
+      sum + (item.price * item.quantity), 0
+    );
+
+    const newOrder = new Order({
+      customerId,
+      customerName,
+      customerEmail,
+      items,
+      totalAmount: parseFloat(totalAmount.toFixed(2)),
+      status: 'pending',
+      shippingAddress,
+      paymentMethod
+    });
+
+    await newOrder.save();
+
+    logger.info('Order created successfully', { orderId: newOrder._id, customerId, totalAmount });
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created successfully',
+      data: newOrder
+    });
+  } catch (error) {
+    logger.error('Error creating order', error as Error);
+
+    if ((error as any).name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: (error as any).message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create order'
+    });
   }
-
-  // Calculate total amount
-  const totalAmount = items.reduce((sum: number, item: OrderItem) =>
-    sum + (item.price * item.quantity), 0
-  );
-
-  const newOrder: Order = {
-    id: `ORD-${uuidv4().substring(0, 8).toUpperCase()}`,
-    customerId,
-    customerName,
-    items,
-    totalAmount: parseFloat(totalAmount.toFixed(2)),
-    status: 'pending',
-    shippingAddress,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  orders.push(newOrder);
-
-  res.status(201).json({
-    success: true,
-    message: 'Order created successfully',
-    data: newOrder
-  });
 });
 
 /**
  * PUT /api/orders/:id - Update an order
- * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  * Body: { status?, shippingAddress? }
  */
-router.put('/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { status, shippingAddress } = req.body;
-  logger.info('Updating order', { id, body: req.body, query: req.query });
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, shippingAddress } = req.body;
+    logger.info('Updating order', { id, body: req.body });
 
-  const orderIndex = orders.findIndex(o => o.id === id);
+    const order = await Order.findById(id);
 
-  if (orderIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      error: 'Order not found',
-      id
-    });
-  }
-
-  // Update order fields
-  if (status !== undefined) {
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
+    if (!order) {
+      return res.status(404).json({
         success: false,
-        error: 'Invalid status',
-        validStatuses
+        error: 'Order not found',
+        id
       });
     }
-    orders[orderIndex].status = status;
+
+    // Update order fields
+    if (status !== undefined) {
+      order.status = status;
+    }
+
+    if (shippingAddress !== undefined) {
+      order.shippingAddress = shippingAddress;
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Order updated successfully',
+      data: order
+    });
+  } catch (error) {
+    logger.error('Error updating order', error as Error, { id: req.params.id });
+
+    if ((error as any).name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: (error as any).message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update order'
+    });
   }
-
-  if (shippingAddress !== undefined) {
-    orders[orderIndex].shippingAddress = shippingAddress;
-  }
-
-  orders[orderIndex].updatedAt = new Date();
-
-  res.json({
-    success: true,
-    message: 'Order updated successfully',
-    data: orders[orderIndex]
-  });
 });
 
 /**
  * DELETE /api/orders/:id - Cancel an order (soft delete)
- * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  */
-router.delete('/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  logger.info('Cancelling order', { id, query: req.query });
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    logger.info('Cancelling order', { id });
 
-  const orderIndex = orders.findIndex(o => o.id === id);
+    const order = await Order.findById(id);
 
-  if (orderIndex === -1) {
-    return res.status(404).json({
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+        id
+      });
+    }
+
+    // Soft delete by changing status to cancelled
+    order.status = 'cancelled';
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Order cancelled successfully',
+      data: order
+    });
+  } catch (error) {
+    logger.error('Error cancelling order', error as Error, { id: req.params.id });
+    res.status(500).json({
       success: false,
-      error: 'Order not found',
-      id
+      error: 'Failed to cancel order'
     });
   }
-
-  // Soft delete by changing status to cancelled
-  orders[orderIndex].status = 'cancelled';
-  orders[orderIndex].updatedAt = new Date();
-
-  res.json({
-    success: true,
-    message: 'Order cancelled successfully',
-    data: orders[orderIndex]
-  });
 });
 
 /**
  * GET /api/orders/customer/:customerId - Get all orders for a customer
- * Query params: scenario (error|internal-error|long-latency|random-latency|timeout|normal)
  */
-router.get('/customer/:customerId', (req: Request, res: Response) => {
-  const { customerId } = req.params;
-  logger.info('Fetching orders for customer', { customerId, query: req.query });
+router.get('/customer/:customerId', async (req: Request, res: Response) => {
+  try {
+    const { customerId } = req.params;
+    logger.info('Fetching orders for customer', { customerId });
 
-  const customerOrders = orders.filter(o => o.customerId === customerId);
+    const customerOrders = await Order.find({ customerId }).sort({ createdAt: -1 });
 
-  res.json({
-    success: true,
-    count: customerOrders.length,
-    data: customerOrders
-  });
+    res.json({
+      success: true,
+      count: customerOrders.length,
+      data: customerOrders
+    });
+  } catch (error) {
+    logger.error('Error fetching customer orders', error as Error, { customerId: req.params.customerId });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch customer orders'
+    });
+  }
+});
+
+/**
+ * GET /api/orders/merchant/:merchantId - Get all orders containing products from a merchant
+ */
+router.get('/merchant/:merchantId', async (req: Request, res: Response) => {
+  try {
+    const { merchantId } = req.params;
+    logger.info('Fetching orders for merchant', { merchantId });
+
+    // Find orders that contain items from this merchant
+    const merchantOrders = await Order.find({
+      'items.merchantId': merchantId
+    }).sort({ createdAt: -1 });
+
+    // Calculate merchant-specific stats
+    let totalRevenue = 0;
+    let itemsSold = 0;
+
+    merchantOrders.forEach((order: any) => {
+      order.items.forEach((item: any) => {
+        if (item.merchantId === merchantId) {
+          totalRevenue += item.price * item.quantity;
+          itemsSold += item.quantity;
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      count: merchantOrders.length,
+      data: {
+        orders: merchantOrders,
+        stats: {
+          totalOrders: merchantOrders.length,
+          totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          itemsSold
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching merchant orders', error as Error, { merchantId: req.params.merchantId });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch merchant orders'
+    });
+  }
 });
 
 export default router;

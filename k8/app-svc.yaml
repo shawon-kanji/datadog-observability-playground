@@ -13,3 +13,4 @@ spec:
       name: http
       nodePort: 30000
       port: 3000
+      targetPort: 3000

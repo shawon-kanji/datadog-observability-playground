@@ -1,40 +1,39 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dd-app-api
+  name: user-auth-deployment
   labels:
-    app: dd-app-api-deployment
+    app: user-auth
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: dd-app-api
+      app: user-auth
   template:
     metadata:
       labels:
-        app: dd-app-api
+        app: user-auth
     spec:
       containers:
-        - name: dd-app-api
-          image: "datadog-crud-api:latest"
-          imagePullPolicy: Never
+        - image: "789250471796.dkr.ecr.ap-southeast-1.amazonaws.com/datadog-playground/user-service:latest"
+          name: user-auth
+          imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - containerPort: 3002
           env:
             - name: PORT
-              value: "3000"
+              value: "3002"
             - name: NODE_ENV
               value: "development"
             - name: MONGODB_URI
-              value: "mongodb://mongo-service:27017/product-service"
-            - name: ORDER_SERVICE_URL
-              value: "http://order-service:3001"
+              value: "mongodb://mongo-service:27017/user-service"
             - name: JWT_SECRET
               value: "your-secret-key-change-in-production"
+            - name: JWT_EXPIRES_IN
+              value: "24h"
             - name: DD_SERVICE
-              value: "product-service"
+              value: "user-service"
             - name: DD_ENV
               value: "development"
             - name: DD_VERSION
               value: "1.0.0"
-

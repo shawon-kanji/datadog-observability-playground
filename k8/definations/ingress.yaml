@@ -1,0 +1,102 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: datadog-playground-ingress
+  namespace: default
+  annotations:
+    # Nginx-specific annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Enable CORS if needed
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    # Rate limiting (optional)
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - datadog-playground.local
+    secretName: datadog-playground-tls
+  rules:
+  - host: datadog-playground.local
+    http:
+      paths:
+      # Frontend - serve static files
+      - path: /()(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+
+      # API routes - rewrite /api/* to /*
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: dd-app-api-service
+            port:
+              number: 3000
+
+      # Auth routes - rewrite /auth/* to /*
+      - path: /auth(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: user-auth-service
+            port:
+              number: 3002
+---
+# Alternative simpler version without path rewriting
+# Uncomment this if your backend services expect the full path including /api, /auth prefixes
+#
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: datadog-playground-ingress-simple
+#   namespace: default
+#   annotations:
+#     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+#     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+# spec:
+#   ingressClassName: nginx
+#   tls:
+#   - hosts:
+#     - datadog-playground.local
+#     secretName: datadog-playground-tls
+#   rules:
+#   - host: datadog-playground.local
+#     http:
+#       paths:
+#       - path: /api
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: dd-app-api-service
+#             port:
+#               number: 3000
+#       - path: /auth
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: user-auth-service
+#             port:
+#               number: 3002
+#       - path: /orders
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: order-service
+#             port:
+#               number: 3001
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: frontend-service
+#             port:
+#               number: 80

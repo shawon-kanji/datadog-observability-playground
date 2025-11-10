@@ -40,3 +40,5 @@ cdk.context.json
 .cache/
 .turbo/
 .eslintcache
+
+k8/certs/
